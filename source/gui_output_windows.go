@@ -78,6 +78,11 @@ func refreshList() {
         for i,id:=range ui.ids {if id==selectedID {next=i;break}}
         invoke(sendMessage,ui.list,lbSetCurSel,uintptr(next),0)
     }
+    if ui.emptyHint!=0 {
+        show:=uintptr(0)
+        if len(ui.ids)==0 {show=5}
+        invoke(showWindow,ui.emptyHint,show)
+    }
     updateProjectStage()
 }
 func selected() string {
