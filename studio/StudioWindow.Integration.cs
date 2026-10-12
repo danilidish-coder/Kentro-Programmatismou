@@ -69,7 +69,13 @@ internal sealed partial class StudioWindow
             Mark("UI-driven optional Setup stage");
 
             var report = await EngineBridge.RunAsync("report", id);
-            Require(File.Exists(Value(report, "path")), "Exported report must exist");
+            var reportPath = Value(report, "path");
+            lines.Add("DEBUG: report payload=" + report.GetRawText());
+            lines.Add("DEBUG: resolved path=" + reportPath);
+            lines.Add("DEBUG: report-path length=" + reportPath.Length);
+            lines.Add("DEBUG: parent-exists=" + Directory.Exists(Path.GetDirectoryName(reportPath) ?? ""));
+            lines.Add("DEBUG: localappdata=" + Environment.GetEnvironmentVariable("LOCALAPPDATA"));
+            Require(File.Exists(reportPath), "Exported report must exist: " + reportPath);
             var backup = await EngineBridge.RunAsync("backup", id);
             Require(File.Exists(Path.Combine(Value(backup, "path"), "backup.json")),
                 "Backup must preserve integrity manifest");
