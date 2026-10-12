@@ -40,9 +40,12 @@ internal sealed partial class StudioWindow : Window
         SystemBackdrop = new MicaBackdrop();
         var display = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(
             AppWindow.Id, Microsoft.UI.Windowing.DisplayAreaFallback.Primary);
-        var width = Math.Min(1210, Math.Max(700, display.WorkArea.Width - 32));
-        var height = Math.Min(810, Math.Max(500, display.WorkArea.Height - 32));
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(width, height));
+        // Keep the entire decorated window on screen (including resize borders).
+        var width = Math.Min(1210, Math.Max(640, display.WorkArea.Width - 80));
+        var height = Math.Min(810, Math.Max(480, display.WorkArea.Height - 80));
+        var left = display.WorkArea.X + Math.Max(0, (display.WorkArea.Width - width) / 2);
+        var top = display.WorkArea.Y + Math.Max(0, (display.WorkArea.Height - height) / 2);
+        AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(left, top, width, height));
         Content = BuildLayout();
 
         projects.SelectionMode = ListViewSelectionMode.Single;
