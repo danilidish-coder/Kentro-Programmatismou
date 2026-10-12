@@ -110,7 +110,7 @@ func paintBackground(hwnd uintptr) {
 		paintFill(dc, sidebar, brushSide)
 		paintFill(dc, rect{331, 103, w - 16, h - 53}, brushPanel)
 		y := int32(417)
-		if ui.advanced { y = 579 }
+		if ui.advanced { y = 511 }
 		paintFill(dc, rect{345, y, w - 30, h - 66}, brushField)
 	}
 }
@@ -216,6 +216,10 @@ func buttonCaption(id int) string {
 		return "Ακύρωση δοκιμών"
 	case 112:
 		return "Επιπλέον δυνατότητες"
+	case 113:
+		return "Αφαίρεση έργου"
+	case 114:
+		return "Επαναφορά έργου"
 	}
 	return ""
 }
