@@ -255,6 +255,16 @@ func TestExampleFullPipeline(t *testing.T) {
 	}
 }
 
+func TestMissingStressToolIsNotRun(t *testing.T) {
+	t.Setenv("PATH", "")
+	r := runStress(context.Background(), t.TempDir(), t.TempDir(), 0, StressSpec{
+		Name: "Parallel checks", Kind: "parallel", Command: "go", Parallel: 3, Repeats: 5,
+	})
+	if r.Status != "NOT RUN" || !strings.Contains(r.Reason, "go") || r.DurationMS != 0 {
+		t.Fatalf("Missing Go incorrectly reported as %s: %+v", r.Status, r)
+	}
+}
+
 // Test the repository shape used by Python applications such as Position Tracking.
 func TestAutoManifestPythonScriptDiscovery(t *testing.T) {
 	root := t.TempDir()

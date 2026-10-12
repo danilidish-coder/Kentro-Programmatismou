@@ -109,7 +109,9 @@ func paintBackground(hwnd uintptr) {
 		var sidebar = rect{16, 103, 318, h - 53}
 		paintFill(dc, sidebar, brushSide)
 		paintFill(dc, rect{331, 103, w - 16, h - 53}, brushPanel)
-		paintFill(dc, rect{345, 474, w - 30, h - 66}, brushField)
+		y := int32(417)
+		if ui.advanced { y = 579 }
+		paintFill(dc, rect{345, y, w - 30, h - 66}, brushField)
 	}
 }
 func colorStatic(dc, hwnd uintptr) uintptr {
@@ -191,27 +193,29 @@ func drawButton(d *drawItemStruct) {
 func buttonCaption(id int) string {
 	switch id {
 	case 101:
-		return "＋  ΕΙΣΑΓΩΓΗ ΕΡΓΟΥ ZIP"
+		return "1.  ΕΙΣΑΓΩΓΗ ΕΡΓΟΥ"
 	case 102:
-		return "◫  Ανάλυση έργου"
+		return "2.  Τι περιέχει το έργο;"
 	case 103:
-		return "▶  Εκτέλεση ελέγχων"
+		return "3.  Δοκιμές και κατασκευή"
 	case 104:
-		return "▤  Αποτελέσματα"
+		return "4.  Αποτελέσματα"
 	case 105:
-		return "⇧  Εξαγωγή αναφοράς"
+		return "5.  Αναφορά για το ChatGPT"
 	case 106:
-		return "▣  Αντίγραφο ασφαλείας"
+		return "Αντίγραφο ασφαλείας"
 	case 107:
-		return "↶  Επαναφορά αντιγράφου"
+		return "Επαναφορά αντιγράφου"
 	case 108:
-		return "✓  Έγκριση έκδοσης"
+		return "Έγκριση έκδοσης"
 	case 109:
-		return "▱  Φάκελος έργου"
+		return "Άνοιγμα φακέλου"
 	case 110:
-		return "↻  Ανανέωση λίστας"
+		return "Ανανέωση λίστας"
 	case 111:
-		return "■  Ακύρωση ελέγχου"
+		return "Ακύρωση δοκιμών"
+	case 112:
+		return "Επιπλέον δυνατότητες"
 	}
 	return ""
 }

@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"kentro.local/programmatismou/engine"
 	"os/exec"
 	"path/filepath"
@@ -116,6 +117,7 @@ var ui struct {
 	jobCtx                                                                                      context.Context
 	mu                                                                                          sync.Mutex
 	pending                                                                                     []event
+	advanced                                                                                    bool
 }
 
 func startApp() {
@@ -169,10 +171,10 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		ui.header = control("STATIC", "Κέντρο Προγραμματισμού", wsChildVisible, 0, 84, 20, 850, 42)
 		invoke(sendMessage, ui.header, wmSetFont, fontTitle, 1)
 		invoke(sendMessage, ui.brand, wmSetFont, fontHeading, 1)
-		ui.subhead = control("STATIC", "ΤΟΠΙΚΟ ΕΡΓΑΣΤΗΡΙΟ  •  ΑΥΤΟΝΟΜΟ  •  ΕΚΔΟΣΗ "+engine.ProductVersion, wsChildVisible, 0, 86, 61, 800, 24)
+		ui.subhead = control("STATIC", "ΜΟΝΟ ΣΤΟΝ ΥΠΟΛΟΓΙΣΤΗ ΣΟΥ  •  ΕΚΔΟΣΗ "+engine.ProductVersion, wsChildVisible, 0, 86, 61, 800, 24)
 		ui.projectTitle = control("STATIC", "ΤΑ ΕΡΓΑ ΜΟΥ", wsChildVisible, 0, 28, 105, 250, 28)
-		ui.actionTitle = control("STATIC", "ΕΡΓΑΣΙΕΣ & ΕΛΕΓΧΟΙ", wsChildVisible, 0, 345, 105, 660, 28)
-		ui.resultsTitle = control("STATIC", "ΑΠΟΤΕΛΕΣΜΑΤΑ ΕΡΓΑΣΙΩΝ", wsChildVisible, 0, 345, 452, 660, 27)
+		ui.actionTitle = control("STATIC", "ΑΚΟΛΟΥΘΗΣΤΕ ΤΑ ΒΗΜΑΤΑ", wsChildVisible, 0, 345, 105, 660, 28)
+		ui.resultsTitle = control("STATIC", "ΤΙ ΣΥΜΒΑΙΝΕΙ ΣΤΟ ΕΡΓΟ ΜΟΥ", wsChildVisible, 0, 345, 452, 660, 27)
 		ui.footer = control("STATIC", "Τοπική λειτουργία • Τα έργα παραμένουν στον υπολογιστή", wsChildVisible, 0, 28, 690, 860, 28)
 		ui.list = control("LISTBOX", "", wsChildVisible|wsTabStop|wsVscroll|0x0001|0x0040, 90, 28, 200, 275, 450)
 		btns := []struct {
@@ -182,15 +184,18 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 			{101, "＋  Εισαγωγή έργου ZIP"}, {102, "◫  Ανάλυση έργου"}, {103, "▶  Εκτέλεση όλων των ελέγχων"},
 			{104, "▤  Προβολή αποτελεσμάτων"}, {105, "⇧  Εξαγωγή αναφοράς"}, {106, "▣  Αντίγραφο ασφαλείας"},
 			{107, "↶  Επαναφορά αντιγράφου"}, {108, "✓  Έγκριση σταθερής έκδοσης"}, {109, "▱  Άνοιγμα φακέλου έργου"}, {110, "↻  Ανανέωση λίστας"},
-			{111, "■  Ακύρωση ελέγχου"},
+			{111, "Ακύρωση δοκιμών"}, {112, "Περισσότερες δυνατότητες"},
 		}
 		for _, v := range btns {
 			ui.buttons[v.id] = control("BUTTON", v.label, wsChildVisible|wsTabStop|bsOwnerDraw, v.id, 0, 0, 10, 10)
 		}
 		invoke(enableWindow, ui.buttons[111], 0)
+		for _, id := range []int{106, 107, 108, 109, 110} {
+			invoke(showWindow, ui.buttons[id], 0)
+		}
 		ui.output = control("EDIT", "Επιλέξτε αρχείο ZIP για εισαγωγή ή έργο από τη λίστα.", wsChildVisible|wsVscroll|esMultiline|esAutoVscroll|esReadonly, 91, 345, 490, 680, 230)
-		ui.logs = "Το Κέντρο Προγραμματισμού είναι έτοιμο. Εισάγετε ένα ZIP για να ξεκινήσετε."
-		invoke(sendMessage, ui.output, wmSetFont, fontMono, 1)
+		ui.logs = "Καλώς ήρθατε στο Κέντρο Προγραμματισμού.\r\n\r\nΒήμα 1: Εισάγετε το έργο σας (ZIP).\r\nΒήμα 2: Δείτε τι χρειάζεται το έργο.\r\nΒήμα 3: Εκτελέστε ελέγχους και κατασκευή.\r\nΒήμα 4: Δείτε τα αποτελέσματα."
+		invoke(sendMessage, ui.output, wmSetFont, fontBody, 1)
 		layout(hwnd)
 		refreshList()
 		return 0
@@ -286,28 +291,41 @@ func layout(hwnd uintptr) {
 	mainX := 345
 	contentW := w - mainX - 28
 	half := (contentW - 12) / 2
+	resultsTop := 378
+	if ui.advanced {
+		resultsTop = 540
+	}
 	invoke(moveWindow, ui.brand, 27, 21, 43, 40, 1)
 	invoke(moveWindow, ui.header, 85, 18, uintptr(w-100), 42, 1)
 	invoke(moveWindow, ui.subhead, 87, 61, uintptr(w-110), 25, 1)
 	invoke(moveWindow, ui.projectTitle, 28, 113, 285, 28, 1)
 	invoke(moveWindow, ui.actionTitle, uintptr(mainX), 113, uintptr(contentW), 28, 1)
-	invoke(moveWindow, ui.resultsTitle, uintptr(mainX), 441, uintptr(contentW), 28, 1)
+	invoke(moveWindow, ui.resultsTitle, uintptr(mainX), uintptr(resultsTop), uintptr(contentW), 28, 1)
 	invoke(moveWindow, ui.list, 28, 202, 275, uintptr(h-285), 1)
 	invoke(moveWindow, ui.footer, 28, uintptr(h-39), uintptr(w-58), 26, 1)
-	// One large import button in the left rail.
 	invoke(moveWindow, ui.buttons[101], 28, 148, 275, 47, 1)
-	ids := []int{102, 103, 104, 105, 106, 107, 108, 109, 110, 111}
-	for i, id := range ids {
+	for i, id := range []int{102, 103, 104, 105} {
 		col, row := i%2, i/2
 		x := mainX + col*(half+12)
-		y := 148 + row*56
-		invoke(moveWindow, ui.buttons[id], uintptr(x), uintptr(y), uintptr(half), 48, 1)
+		y := 149 + row*73
+		invoke(moveWindow, ui.buttons[id], uintptr(x), uintptr(y), uintptr(half), 62, 1)
 	}
-	outH := h - 545
-	if outH < 110 {
-		outH = 110
+	invoke(moveWindow, ui.buttons[112], uintptr(mainX), 296, uintptr(half), 48, 1)
+	invoke(moveWindow, ui.buttons[111], uintptr(mainX+half+12), 296, uintptr(half), 48, 1)
+	if ui.advanced {
+		for i, id := range []int{106, 107, 108, 109, 110} {
+			col, row := i%2, i/2
+			x := mainX + col*(half+12)
+			y := 359 + row*51
+			invoke(moveWindow, ui.buttons[id], uintptr(x), uintptr(y), uintptr(half), 43, 1)
+		}
 	}
-	invoke(moveWindow, ui.output, uintptr(mainX+14), 482, uintptr(contentW-28), uintptr(outH), 1)
+	outY := resultsTop + 39
+	outH := h - outY - 65
+	if outH < 82 {
+		outH = 82
+	}
+	invoke(moveWindow, ui.output, uintptr(mainX+14), uintptr(outY), uintptr(contentW-28), uintptr(outH), 1)
 	invoke(user32.NewProc("InvalidateRect"), hwnd, 0, 1)
 }
 func queue(ev event) {
@@ -317,6 +335,8 @@ func queue(ev event) {
 	invoke(postMessage, ui.main, wmApp+3, 0, 0)
 }
 func appendOutput(s string) {
+	s = strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\r", "\n")
+	s = strings.ReplaceAll(s, "\n", "\r\n")
 	ui.logs += "\r\n" + s
 	if len(ui.logs) > 28000 {
 		ui.logs = ui.logs[len(ui.logs)-25000:]
@@ -367,7 +387,27 @@ func begin(task func(func(string))) {
 	}
 	go func() { defer queue(event{done: true, refresh: true}); task(func(s string) { queue(event{line: s}) }) }()
 }
+func displayZIPName(path string) string {
+	base := filepath.Base(path)
+	if decoded, e := url.PathUnescape(base); e == nil && decoded != "" {
+		return decoded
+	}
+	return base
+}
+
 func onButton(id int) {
+	if id == 112 {
+		ui.advanced = !ui.advanced
+		for _, adv := range []int{106, 107, 108, 109, 110} {
+			if ui.advanced {
+				invoke(showWindow, ui.buttons[adv], 1)
+			} else {
+				invoke(showWindow, ui.buttons[adv], 0)
+			}
+		}
+		layout(ui.main)
+		return
+	}
 	if id == 111 {
 		if ui.cancel != nil {
 			ui.cancel()
@@ -392,12 +432,12 @@ func onButton(id int) {
 			msgbox(ui.main, "Το ZIP απορρίφθηκε: "+er.Error(), "Έλεγχος εισαγωγής", 0x10)
 			return
 		}
-		message := fmt.Sprintf("Αρχείο: %s\nΠεριεχόμενο: %d αρχεία (%.1f MB ασυμπίεστα)\nΣχέδιο ελέγχων: %t\n\nΘέλετε να εισαχθεί ως νέο έργο;", filepath.Base(file), preview.Files, float64(preview.SizeBytes)/1048576, preview.ContainsManifest)
+		message := fmt.Sprintf("Αρχείο: %s\nΠεριεχόμενο: %d αρχεία (%.1f MB ασυμπίεστα)\nΈτοιμες οδηγίες δοκιμής: %t\n\nΘέλετε να εισαχθεί ως νέο έργο;", displayZIPName(file), preview.Files, float64(preview.SizeBytes)/1048576, preview.ContainsManifest)
 		if msgbox(ui.main, message, "Προεπισκόπηση ZIP", mbYesNo|0x40) != idYes {
 			return
 		}
 		begin(func(log func(string)) {
-			log("Παραλαβή ZIP: " + filepath.Base(file))
+			log("Παραλαβή έργου: " + displayZIPName(file))
 			p, e := ui.store.ImportZIP(file)
 			if e != nil {
 				log("ΑΠΟΤΥΧΙΑ: " + e.Error())
@@ -430,7 +470,16 @@ func onButton(id int) {
 				return
 			}
 			if r.Blocked {
-				log("ΑΠΟΚΛΕΙΣΜΟΣ: η έκδοση ΔΕΝ εγκρίνεται ως σταθερή")
+								missing := false
+				for _, step := range r.Results {
+					if step.Status == "NOT RUN" && strings.Contains(step.Reason, "Δεν βρέθηκε το απαραίτητο εργαλείο") {
+						missing = true
+					}
+				}
+				if missing {
+					log("Χρειάζεται προετοιμασία υπολογιστή: λείπει εργαλείο που απαιτεί το έργο. Δεν σημαίνει ότι ο κώδικας απέτυχε.")
+				}
+				log("Οι υποχρεωτικοί έλεγχοι δεν ολοκληρώθηκαν. Η έκδοση παραμένει δοκιμαστική.")
 			} else {
 				log("Όλοι οι υποχρεωτικοί έλεγχοι ολοκληρώθηκαν — επιτρέπεται η έγκριση")
 			}

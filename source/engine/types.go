@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const ProductVersion = "1.0.0-beta2"
+const ProductVersion = "1.0.0-beta3"
 
 type Step struct {
 	Name           string   `json:"name"`

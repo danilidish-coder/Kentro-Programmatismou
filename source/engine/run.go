@@ -362,6 +362,12 @@ func runStress(ctx context.Context, work, logs string, i int, sp StressSpec) Res
 		}
 		return restartStress(ctx, work, logs, i, sp)
 	}
+	// Missing compilers produce NOT RUN, not fake failed stress iterations.
+	if _, _, err := resolve(work, sp.Command, sp.Args); err != nil {
+		r.Status = "NOT RUN"
+		r.Reason = err.Error()
+		return r
+	}
 	count := sp.Repeats
 	if count <= 0 {
 		count = 3
