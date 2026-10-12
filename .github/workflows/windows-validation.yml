@@ -39,7 +39,7 @@ jobs:
         working-directory: source
         run: |
           $env:KENTRO_RUN_PY_BUILD_TEST = '1'
-          go test -count=1 -timeout 10m -run 'TestPythonBuildEndToEndWindows' -v ./engine 2>&1 | Tee-Object -FilePath ../build/windows-python-end-to-end.log
+          go test -count=1 -timeout 10m -run 'TestPythonBuildEndToEndWindows|TestEndToEndStagesAreSeparateOnWindows' -v ./engine 2>&1 | Tee-Object -FilePath ../build/windows-python-end-to-end.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build actual Windows application and Setup
         run: |
@@ -63,6 +63,7 @@ jobs:
             build/windows-unit.log
             build/windows-python-end-to-end.log
             build/windows-ui-smoke.log
+            build/windows-gui-render.png
           if-no-files-found: warn
       - name: Publish EXE and Setup only if every required check passed
         if: success()

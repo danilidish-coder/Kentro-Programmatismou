@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const ProductVersion = "1.0.0-beta5"
+const ProductVersion = "1.0.0-beta6"
 
 type Step struct {
 	Name           string   `json:"name"`
@@ -46,6 +46,7 @@ type Manifest struct {
 	Tests    []Step       `json:"tests"`
 	Stress   []StressSpec `json:"stress"`
 	Build    *Step        `json:"build"`
+	Setup    *Step        `json:"setup,omitempty"`
 	Smoke    *Step        `json:"smoke"`
 	Visual   []Step       `json:"visual,omitempty"`
 }
@@ -79,6 +80,7 @@ type Artifact struct {
 
 type Run struct {
 	ID         string     `json:"id"`
+	Stage      string     `json:"stage,omitempty"`
 	ProjectID  string     `json:"project_id"`
 	SourceHash string     `json:"source_hash"`
 	PlanHash   string     `json:"plan_hash"`
@@ -236,6 +238,9 @@ func ValidateManifest(m Manifest) error {
 		if e := validateStep(*m.Smoke); e != nil {
 			return e
 		}
+	}
+	if m.Setup != nil {
+		if e := validateStep(*m.Setup); e != nil {return e}
 	}
 	if len(m.Visual) > 12 {
 		return errors.New("Πάρα πολλά οπτικά τεστ")

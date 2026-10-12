@@ -13,6 +13,8 @@ public static class UIMessage {
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hwnd, System.Text.StringBuilder buffer, int maxCount);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
   [DllImport("user32.dll")] public static extern int GetDlgCtrlID(IntPtr hwnd);
+  [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr parent, int id);
+  [DllImport("user32.dll")] public static extern int GetSystemMetrics(int id);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr hwnd, uint message, IntPtr wp, System.Text.StringBuilder lp);
   [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hwnd, uint message, IntPtr wp, IntPtr lp);
   [StructLayout(LayoutKind.Sequential)] public struct Rect { public int L,T,R,B; }
@@ -32,6 +34,15 @@ try {
     }
     if ($hwnd -eq [IntPtr]::Zero) { throw 'NOT RUN: Windows runner does not expose a usable desktop session' }
     Trace "PASS: visible native main window: $hwnd"
+    $mainRect=[UIMessage+Rect]::new()
+    if(-not [UIMessage]::GetWindowRect($hwnd,[ref]$mainRect)){throw 'FAIL: cannot read app window size'}
+    $desktopWidth=[UIMessage]::GetSystemMetrics(0)
+    $desktopHeight=[UIMessage]::GetSystemMetrics(1)
+    if($mainRect.L -lt 0 -or $mainRect.T -lt 0 -or $mainRect.R -gt $desktopWidth -or $mainRect.B -gt $desktopHeight){
+        throw "FAIL: app exceeds screen ($($mainRect.L),$($mainRect.T),$($mainRect.R),$($mainRect.B)) vs $desktopWidth x $desktopHeight"
+    }
+    Trace "PASS: application fits in screen $desktopWidth x $desktopHeight"
+
     [UIMessage]::PostMessage($hwnd, 0x8009, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
     Start-Sleep -Milliseconds 1300
     $results=[IntPtr]::Zero
@@ -62,6 +73,27 @@ try {
         } finally {$graphics.Dispose();$bmp.Dispose()}
       }
     } catch { Trace "NOT RUN: screenshot unsupported on runner: $($_.Exception.Message)" }
+
+    # Verify four visible stages and non-overlapping native controls.
+    function Get-ById([int]$id) {
+        $handle=[UIMessage]::GetDlgItem($hwnd,$id)
+        if($handle -eq [IntPtr]::Zero){throw "FAIL: GetDlgItem cannot find button $id"}
+        return $handle
+    }
+    $ordered=@(103,115,116)
+    $controlRects=@{}
+    foreach($id in $ordered){
+        $handle = Get-ById $id
+        $rc2=[UIMessage+Rect]::new()
+        if(-not [UIMessage]::GetWindowRect($handle,[ref]$rc2)){throw "FAIL: stage $id has no rectangle"}
+        $controlRects[$id]=$rc2
+    }
+    if($controlRects[103].B -gt $controlRects[115].T){throw 'FAIL: check and EXE stages overlap'}
+    if([Math]::Abs($controlRects[115].T-$controlRects[116].T) -gt 2){throw 'FAIL: EXE and Setup are not separate adjacent buttons'}
+    $outRect=[UIMessage+Rect]::new()
+    if(-not [UIMessage]::GetWindowRect($results,[ref]$outRect)){throw 'FAIL: results rect missing'}
+    if($controlRects[116].B -gt $outRect.T){throw 'FAIL: Setup button overlaps output report'}
+    Trace 'PASS: visible ordered checks/report/EXE/optional Setup controls do not overlap'
 
     [UIMessage]::PostMessage($hwnd,0x0111,[IntPtr]101,[IntPtr]::Zero) | Out-Null
     $picker = $null

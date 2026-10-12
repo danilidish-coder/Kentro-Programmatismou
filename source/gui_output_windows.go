@@ -3,6 +3,7 @@
 package main
 
 import (
+	"kentro.local/programmatismou/engine"
 	"fmt"
 	"sort"
 	"strings"
@@ -67,6 +68,7 @@ func refreshList() {
 	if len(ui.ids) > 0 {
 		invoke(sendMessage, ui.list, lbSetCurSel, 0, 0)
 	}
+	updateProjectStage()
 }
 func selected() string {
 	n := invoke(sendMessage, ui.list, lbGetCurSel, 0, 0)
@@ -75,4 +77,30 @@ func selected() string {
 		return ""
 	}
 	return ui.ids[int(n)]
+}
+
+func showStage(value string) {
+    if ui.stageStatus != 0 {
+        invoke(sendMessage,ui.stageStatus,wmSetText,0,uintptr(unsafe.Pointer(u16(value))))
+    }
+}
+func updateProjectStage() {
+    if ui.list==0 || ui.store==nil {return}
+    index:=invoke(sendMessage,ui.list,lbGetCurSel,0,0)
+    if index==^uintptr(0)||int(index)>=len(ui.ids) {
+        showStage("1/4 · Εισάγετε ή επιλέξτε έργο")
+        return
+    }
+    id:=ui.ids[int(index)]
+    run,err:=ui.store.LatestChecks(id)
+    if err!=nil {showStage("2/4 · Αναμονή λειτουργικών ελέγχων και stress tests");return}
+    if engine.IsChecksBlocked(run) {showStage("2/4 · Εντοπίστηκαν προβλήματα — EXE αποκλεισμένο");return}
+    if err:=ui.store.ReadyForBuild(id);err!=nil {showStage("2/4 · Διαβάστε την αναφορά — "+err.Error());return}
+    if err:=ui.store.ReadyForSetup(id);err==nil {showStage("4/4 · Το EXE πέρασε — προαιρετικό Setup διαθέσιμο");return}
+    latest,err:=ui.store.LatestRun(id)
+    if err==nil && latest.Stage==engine.StageBuild && !latest.Blocked {
+        showStage("3/4 · Το EXE ολοκληρώθηκε — Setup μόνο με διαθέσιμη συνταγή")
+        return
+    }
+    showStage("3/4 · Οι έλεγχοι πέρασαν — μπορείτε να κατασκευάσετε EXE")
 }

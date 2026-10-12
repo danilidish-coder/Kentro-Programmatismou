@@ -108,7 +108,7 @@ func paintBackground(hwnd uintptr) {
 	if w > 20 && h > 120 {
 		paintFill(dc, rect{13, 109, 316, h - 53}, brushSide)
 		paintFill(dc, rect{322, 109, w - 15, h - 53}, brushPanel)
-		paintFill(dc, rect{339, 404, w - 28, h - 66}, brushField)
+		paintFill(dc, rect{339, 459, w - 28, h - 66}, brushField)
 	}
 }
 func colorStatic(dc, hwnd uintptr) uintptr {
@@ -129,6 +129,9 @@ func colorStatic(dc, hwnd uintptr) uintptr {
 		brush = brushSide
 	case ui.actionTitle, ui.resultsTitle:
 		clr = dimColor
+		brush = brushPanel
+	case ui.stageStatus:
+		clr = rgb(160, 208, 255)
 		brush = brushPanel
 	case ui.footer:
 		clr = dimColor
@@ -157,10 +160,22 @@ func drawButton(d *drawItemStruct) {
 	enabled := invoke(isWindowEnabled, d.Hwnd) != 0
 	fill := rgb(35, 55, 78)
 	border := rgb(58, 82, 110)
-	if id == 101 || id == 103 {
-		fill = accentColor
-		border = rgb(83, 163, 255)
-	}
+	if id == 103 {
+        fill = accentColor
+        border = rgb(83, 163, 255)
+    } else if id == 115 {
+        fill = rgb(32, 111, 100)
+        border = rgb(68, 175, 150)
+    } else if id == 116 {
+        fill = rgb(52, 65, 90)
+        border = rgb(105, 129, 171)
+    } else if id == 101 {
+        fill = rgb(35, 69, 112)
+        border = rgb(78, 120, 181)
+    } else if id == 104 || id == 105 {
+        fill = rgb(31, 52, 75)
+        border = rgb(60, 87, 124)
+    }
 	if id == 108 {
 		fill = rgb(28, 111, 112)
 		border = rgb(59, 164, 159)
@@ -170,9 +185,9 @@ func drawButton(d *drawItemStruct) {
 		border = rgb(160, 75, 87)
 	}
 	if !enabled {
-		fill = rgb(35, 45, 58)
-		border = rgb(44, 56, 72)
-	}
+        fill = rgb(35,45,58)
+        border = rgb(44,56,72)
+    }
 	brush := makeBrush(fill)
 	pen := invoke(createPen, 0, 1, border)
 	oldBrush := invoke(selectObject, d.Hdc, brush)
@@ -196,11 +211,15 @@ func drawButton(d *drawItemStruct) {
 func buttonCaption(id int) string {
 	switch id {
 	case 101:
-		return "1.  Εισαγωγή κώδικα ZIP"
+		return "01   Εισαγωγή ZIP"
 	case 103:
-		return "2.  Δοκιμή και δημιουργία EXE"
-	case 104:
-		return "3.  Αποτελέσματα"
+        return "02   ΕΛΕΓΧΟΙ ΚΑΙ STRESS TESTS"
+    case 115:
+        return "03   ΔΗΜΙΟΥΡΓΙΑ EXE"
+    case 116:
+        return "04   SETUP (ΠΡΟΑΙΡΕΤΙΚΟ)"
+    case 104:
+        return "Αναφορά ελέγχων"
 	case 105:
 		return "Αναφορά για ChatGPT"
 	case 111:
