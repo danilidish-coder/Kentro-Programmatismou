@@ -226,7 +226,11 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		if l != 0 {
 			var info minMaxInfo
 			invoke(copyNativeMemory, uintptr(unsafe.Pointer(&info)), l, unsafe.Sizeof(info))
+			if ui.advanced {
+			info.MinTrackSize = point{X: 920, Y: 760}
+		} else {
 			info.MinTrackSize = point{X: 920, Y: 680}
+		}
 			invoke(copyNativeMemory, l, uintptr(unsafe.Pointer(&info)), unsafe.Sizeof(info))
 		}
 		return 0
@@ -445,6 +449,19 @@ func onButton(id int) {
 				invoke(showWindow, ui.buttons[adv], 1)
 			} else {
 				invoke(showWindow, ui.buttons[adv], 0)
+			}
+		}
+		if ui.advanced {
+			// Expanded tool area requires additional height so the log and footer
+			// never overlap even on a window previously resized to minimum.
+			var client rect
+			invoke(getClientRect, ui.main, uintptr(unsafe.Pointer(&client)))
+			if client.B-client.T < 700 {
+				var frame rect
+				invoke(user32.NewProc("GetWindowRect"), ui.main, uintptr(unsafe.Pointer(&frame)))
+				extra := uintptr(700 - (client.B - client.T))
+				invoke(user32.NewProc("SetWindowPos"), ui.main, 0, 0, 0,
+					uintptr(frame.R-frame.L), uintptr(frame.B-frame.T)+extra, 0x0002|0x0004)
 			}
 		}
 		layout(ui.main)
