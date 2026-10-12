@@ -552,7 +552,19 @@ func onButton(id int) {
 				}
 				log("Οι υποχρεωτικοί έλεγχοι δεν ολοκληρώθηκαν. Η έκδοση παραμένει δοκιμαστική.")
 			} else {
-				log("Όλοι οι υποχρεωτικοί έλεγχοι ολοκληρώθηκαν — επιτρέπεται η έγκριση")
+				// A non-programmer should not need a second technical approval button.
+                // Promote only after the engine's mandatory gate has passed.
+                stable, err := ui.store.Approve(pID)
+                if err != nil {
+                    log("Οι δοκιμές πέτυχαν αλλά η αποθήκευση EXE δεν ολοκληρώθηκε: " + err.Error())
+                    return
+                }
+                log("Έτοιμη έκδοση: " + stable)
+                exeFolder := filepath.Join(stable, "artifacts")
+                if _, err := os.Stat(exeFolder); err == nil {
+                    log("Ανοίγει ο φάκελος με το ελεγμένο EXE.")
+                    _ = exec.Command("explorer.exe", exeFolder).Start()
+                }
 			}
 		})
 	case 104:
