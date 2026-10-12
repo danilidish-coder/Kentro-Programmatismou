@@ -51,7 +51,24 @@ jobs:
       - name: Launch modern UI on a real Windows runner
         run: |
           ./ci/studio-smoke.ps1
-      - name: Store logs and screenshot even on failure
+      - name: Package complete WinUI app + Go engine inside ONE Windows EXE
+        run: |
+          New-Item -ItemType Directory -Force source/cmd/onefile,single | Out-Null
+          Compress-Archive -Path publish/* -DestinationPath source/cmd/onefile/payload.zip -CompressionLevel Optimal
+          Copy-Item packaging/onefile-launcher.go.txt source/cmd/onefile/main.go
+          Push-Location source
+          go build -trimpath -ldflags '-s -w -H=windowsgui' -o ../single/Kentro_Programmatismou.exe ./cmd/onefile
+          if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
+          Pop-Location
+          $exe = 'single/Kentro_Programmatismou.exe'
+          if(-not (Test-Path $exe)) { throw 'One-file executable was not produced' }
+          if((Get-Item $exe).Length -lt 50000000) { throw 'One-file executable does not contain full application payload' }
+          "ONEFILE_BYTES=$((Get-Item $exe).Length)" | Tee-Object -FilePath studio-onefile-build.log
+          "ONEFILE_SHA256=$((Get-FileHash -Algorithm SHA256 $exe).Hash)" | Tee-Object -FilePath studio-onefile-build.log -Append
+      - name: Test standalone EXE on Windows (first launch and cached launch)
+        run: |
+          ./ci/studio-onefile-smoke.ps1
+      - name: Store diagnostics and screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -61,16 +78,15 @@ jobs:
             studio-build.log
             studio-smoke.log
             studio-screenshot.png
+            studio-onefile-build.log
+            studio-onefile-smoke.log
           if-no-files-found: warn
-      - name: Publish working self-contained Windows folder only on full success
+      - name: Publish single verified Windows EXE
         if: success()
-        run: |
-          Compress-Archive -Path publish/* -DestinationPath Kentro_Programmatismou_Modern_Studio.zip -CompressionLevel Optimal
-      - if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Kentro_Programmatismou_Modern_Studio
-          path: Kentro_Programmatismou_Modern_Studio.zip
+          name: Kentro_Programmatismou_One_EXE
+          path: single/Kentro_Programmatismou.exe
           if-no-files-found: error
 
       - name: Publish versioned GitHub release only after all tests succeed
@@ -78,4 +94,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ github.ref_name }}" "./Kentro_Programmatismou_Modern_Studio.zip" --repo "${{ github.repository }}" --title "Κέντρο Προγραμματισμού · ${{ github.ref_name }}" --generate-notes --verify-tag
+          gh release create "${{ github.ref_name }}" "./single/Kentro_Programmatismou.exe" --repo "${{ github.repository }}" --title "Κέντρο Προγραμματισμού · ${{ github.ref_name }}" --generate-notes --verify-tag
