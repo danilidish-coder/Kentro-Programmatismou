@@ -3,20 +3,34 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $exe = Join-Path $PSScriptRoot '..\publish\Kentro_Programmatismou.exe'
 $log = Join-Path $PSScriptRoot '..\studio-smoke.log'
+$env:KENTRO_STUDIO_DIAG_DIR = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$startedAt = Get-Date
 "Opening native WinUI 3 desktop application..." | Set-Content $log
+function Write-CrashDetails {
+  $crash = Join-Path $env:KENTRO_STUDIO_DIAG_DIR 'studio-crash.log'
+  if (Test-Path $crash) {
+    Get-Content $crash | Tee-Object -FilePath $log -Append
+  }
+  try {
+    Get-WinEvent -FilterHashtable @{ LogName='Application'; StartTime=$startedAt; Level=2 } -MaxEvents 16 -ErrorAction Stop |
+      Where-Object { $_.Message -match 'Kentro|\.NET|WindowsAppSDK|Microsoft\.UI\.Xaml' } |
+      ForEach-Object { "WINDOWS ERROR EVENT $($_.Id): $($_.Message)" | Tee-Object -FilePath $log -Append }
+  } catch { "No matching Windows Application Error events: $_" | Add-Content $log }
+}
 $p = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru
 try {
   $handle = [IntPtr]::Zero
   for ($i=0; $i -lt 40; $i++) {
     Start-Sleep -Milliseconds 500
     $p.Refresh()
-    if ($p.HasExited) { throw "FAIL: new UI process exited with code $($p.ExitCode)" }
+    if ($p.HasExited) { Write-CrashDetails; throw "FAIL: new UI process exited with code $($p.ExitCode)" }
     if ($p.MainWindowHandle -ne [IntPtr]::Zero) { $handle = $p.MainWindowHandle; break }
   }
   if ($handle -eq [IntPtr]::Zero) { throw "NOT VERIFIED: no interactive native Windows window available" }
   "PASS: WinUI 3 window hwnd=$handle" | Tee-Object -FilePath $log -Append
   Start-Sleep -Seconds 2
-  if ($p.HasExited) { throw "FAIL: UI crashed after startup" }
+  $p.Refresh()
+  if ($p.HasExited) { Write-CrashDetails; throw "FAIL: UI crashed after startup with exit code $($p.ExitCode)" }
   Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
