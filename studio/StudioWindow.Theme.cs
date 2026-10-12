@@ -78,13 +78,19 @@ internal sealed partial class StudioWindow
         };
         b.Shadow = new ThemeShadow();
         b.Translation = new Vector3(0, 0, accent ? 20 : 10);
+        // Never scale a text-bearing button: fractional compositor scaling can
+        // briefly resample glyphs and make them look blurry during hover/press.
+        // Retain Fluent feedback through a brighter outline and 3D ThemeShadow.
+        var outline = b.BorderBrush;
+        var hoverOutline = Color(154, 222, 255);
         b.PointerEntered += (_, _) =>
         {
-            if (b.IsEnabled) b.Scale = new Vector3(1.012f, 1.012f, 1);
+            if (b.IsEnabled) b.BorderBrush = hoverOutline;
         };
-        b.PointerExited += (_, _) => b.Scale = Vector3.One;
-        b.PointerPressed += (_, _) => b.Scale = new Vector3(.985f, .985f, 1);
-        b.PointerReleased += (_, _) => b.Scale = Vector3.One;
+        b.PointerExited += (_, _) => b.BorderBrush = outline;
+        b.PointerPressed += (_, _) => b.BorderBrush = Blue;
+        b.PointerReleased += (_, _) => b.BorderBrush = b.IsPointerOver && b.IsEnabled
+            ? hoverOutline : outline;
         return b;
     }
 
