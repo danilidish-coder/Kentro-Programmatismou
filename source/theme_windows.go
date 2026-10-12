@@ -248,7 +248,7 @@ func drawButton(d *drawItemStruct) {
         if primary&&enabled {badgeColor,badgeInk=rgb(93,155,242),rgb(255,255,255)}
         if !enabled {badgeColor,badgeInk=rgb(209,218,229),rgb(106,125,149)}
         marker:=rect{cx,cy,cx+diameter,cy+diameter}
-        roundedArea(d.Hdc,marker,badgeColor,badgeColor,diameter)
+        roundedArea(d.Hdc,marker,badgeColor,badgeColor,int(diameter))
         invoke(setTextColor,d.Hdc,badgeInk)
         invoke(selectObject,d.Hdc,fontSmall)
         invoke(drawText,d.Hdc,uintptr(unsafe.Pointer(u16(label))),uintptr(^uint32(0)),uintptr(unsafe.Pointer(&marker)),0x0025)
