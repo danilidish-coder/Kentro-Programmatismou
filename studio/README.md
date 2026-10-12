@@ -9,9 +9,14 @@
 - `source/engine/`: υπάρχων κώδικας ανάλυσης ZIP, unit/integration/stress, κατασκευής, έγκρισης EXE, αποθήκευσης αναφορών, SHA256. Δεν αλλάζει στην παρούσα μεταφορά.
 - `source/gui*.go` και `source/theme_windows.go`: το παλιό Win32 GUI παραμένει ως βάση beta8 ώσπου να περάσουν πλήρως οι δοκιμές του νέου.
 
-## Εγκατάσταση/παράδοση
+## Εγκατάσταση/παράδοση — ΕΝΑ EXE
 
-Το Windows workflow κατασκευάζει και δημοσιεύει μόνο κατόπιν επιτυχίας το `Kentro_Programmatismou_Modern_Studio.zip`. Αποσυμπιέζουμε **ολόκληρο** τον φάκελο και εκτελούμε `Kentro_Programmatismou.exe`. Η εφαρμογή χρειάζεται τα συνημμένα DLL και το `Kentro_Engine.exe` που βρίσκονται στον ίδιο φάκελο. Δεν απαιτείται Python, Go, GitHub, browser ή Windows App SDK runtime εγκατεστημένο χωριστά για την εκτέλεση.
+Η τελική διανομή είναι **μόνο το `Kentro_Programmatismou.exe`**. Το GitHub Actions workflow `.github/workflows/winui3-studio.yml` δημιουργεί το WinUI 3 front end, την υπάρχουσα μηχανή Go και ένα αυτοδύναμο Windows launcher (`packaging/onefile-launcher.go.txt`) που ενσωματώνει όλα τα απαραίτητα αρχεία.
+
+Ο χειριστής κατεβάζει μόνο το EXE και το ανοίγει, χωρίς Python, Go, GitHub, ZIP, εγκατάσταση SDK ή δικαιώματα διαχειριστή. Στην πρώτη εκτέλεση ο launcher αποσυμπιέζει αυτόματα τα εσωτερικά αρχεία στο `%LOCALAPPDATA%\\KentroProgrammatismou_Clean\\installed-app\\<sha256>` και εκκινεί το WinUI 3. Οι επόμενες εκκινήσεις επαναχρησιμοποιούν το ίδιο cache. Το ενιαίο EXE αποτελεί την **παραδοτέα** μορφή. Το GitHub κρατά τον πηγαίο κώδικα και τα συνοδευτικά.
+
+**Επαλήθευση 12/10/2026:** Windows Action run `38290570311` PASS: Go tests / vet, WinUI 3 publish, πραγματικό GUI smoke, δημιουργία ενιαίου EXE και έλεγχος πρώτης και δεύτερης εκκίνησης/τερματισμού του ενιαίου EXE. SHA256: `7b9344a64fa61f9f900f41dea1b94363b65ce9be3864429cbd9c42181ac262b5`, μέγεθος 95.411.712 bytes. Το νέο GUI παραμένει σε ξεχωριστό branch/draft PR έως ότου ολοκληρωθούν πλήρεις λειτουργικές δοκιμές εισαγωγής και διαχείρισης έργων.
+
 
 ## Πού αποθηκεύονται τα εισαγόμενα προγράμματα
 
