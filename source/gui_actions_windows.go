@@ -80,7 +80,9 @@ func onButton(id int) {
 			if e != nil {
 				log("ΑΠΟΤΥΧΙΑ: " + e.Error())
 			} else {
-				log("Επιτυχής εισαγωγή έργου: " + p.Name + " — " + p.Language)
+				log(fmt.Sprintf("ΕΙΣΗΧΘΗ: %s · Έκδοση %s · Γλώσσα %s",p.Name,p.Version,p.Language))
+                log("Το πρόγραμμα επιλέχθηκε στη λίστα. Οι έλεγχοι ξεκινούν μόνο όταν πατήσετε το αντίστοιχο κουμπί.")
+                queue(event{selectProject:p.ID})
 			}
 		})
 		return
