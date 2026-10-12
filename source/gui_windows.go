@@ -24,6 +24,7 @@ const (
 	wmSize             = 0x0005
 	wmCommand          = 0x0111
 	wmSetFont          = 0x0030
+	wmSetRedraw        = 0x000B
 	wmPaint            = 0x000F
 	wmTimer            = 0x0113
 	emSetSel           = 0x00B1
@@ -194,12 +195,13 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 			{104, "▤  Προβολή αποτελεσμάτων"}, {105, "⇧  Εξαγωγή αναφοράς"}, {106, "▣  Αντίγραφο ασφαλείας"},
 			{107, "↶  Επαναφορά αντιγράφου"}, {108, "✓  Έγκριση σταθερής έκδοσης"}, {109, "▱  Άνοιγμα φακέλου έργου"}, {110, "↻  Ανανέωση λίστας"},
 			{111, "Ακύρωση δοκιμών"}, {112, "Περισσότερες δυνατότητες"},
+			{113, "Αφαίρεση επιλεγμένου έργου"}, {114, "Επαναφορά τελευταίου αφαιρεμένου"},
 		}
 		for _, v := range btns {
 			ui.buttons[v.id] = control("BUTTON", v.label, wsChildVisible|wsTabStop|bsOwnerDraw, v.id, 0, 0, 10, 10)
 		}
 		invoke(enableWindow, ui.buttons[111], 0)
-		for _, id := range []int{106, 107, 108, 109, 110} {
+		for _, id := range []int{106, 107, 108, 109, 110, 114} {
 			invoke(showWindow, ui.buttons[id], 0)
 		}
 		ui.output = control("EDIT", "Επιλέξτε αρχείο ZIP για εισαγωγή ή έργο από τη λίστα.", wsChildVisible|wsVscroll|esMultiline|esAutoVscroll|esReadonly, 91, 345, 490, 680, 230)
@@ -316,7 +318,7 @@ func layout(hwnd uintptr) {
 	half := (contentW - 12) / 2
 	resultsTop := 378
 	if ui.advanced {
-		resultsTop = 540
+		resultsTop = 472
 	}
 	invoke(moveWindow, ui.brand, 27, 21, 43, 40, 1)
 	invoke(moveWindow, ui.header, 85, 18, uintptr(w-100), 42, 1)
@@ -324,7 +326,8 @@ func layout(hwnd uintptr) {
 	invoke(moveWindow, ui.projectTitle, 28, 113, 285, 28, 1)
 	invoke(moveWindow, ui.actionTitle, uintptr(mainX), 113, uintptr(contentW), 28, 1)
 	invoke(moveWindow, ui.resultsTitle, uintptr(mainX), uintptr(resultsTop), uintptr(contentW), 28, 1)
-	invoke(moveWindow, ui.list, 28, 202, 275, uintptr(h-285), 1)
+	invoke(moveWindow, ui.list, 28, 202, 275, uintptr(h-325), 1)
+	invoke(moveWindow, ui.buttons[113], 28, uintptr(h-114), 275, 45, 1)
 	invoke(moveWindow, ui.footer, 28, uintptr(h-39), uintptr(w-58), 26, 1)
 	invoke(moveWindow, ui.buttons[101], 28, 148, 275, 47, 1)
 	// The main flow shows only four steps after ZIP import.
@@ -337,11 +340,12 @@ func layout(hwnd uintptr) {
 	invoke(moveWindow, ui.buttons[112], uintptr(mainX), 296, uintptr(half), 48, 1)
 	invoke(moveWindow, ui.buttons[111], uintptr(mainX+half+12), 296, uintptr(half), 48, 1)
 	if ui.advanced {
-		for i, id := range []int{106, 107, 108, 109, 110} {
-			col, row := i%2, i/2
-			x := mainX + col*(half+12)
-			y := 359 + row*51
-			invoke(moveWindow, ui.buttons[id], uintptr(x), uintptr(y), uintptr(half), 43, 1)
+		for i, id := range []int{106, 107, 108, 109, 110, 114} {
+			col, row := i%3, i/3
+			bw := (contentW - 16) / 3
+			x := mainX + col*(bw+8)
+			y := 355 + row*49
+			invoke(moveWindow, ui.buttons[id], uintptr(x), uintptr(y), uintptr(bw), 42, 1)
 		}
 	}
 	outY := resultsTop + 39
@@ -359,20 +363,24 @@ func queue(ev event) {
 	invoke(postMessage, ui.main, wmApp+3, 0, 0)
 }
 func appendOutput(s string) {
-	// Append only new text and scroll to the end. Replacing the whole Edit
-	// control on every event previously caused overlapping redraws in Windows.
+	// WM_SETTEXT is allowed on ES_READONLY, unlike EM_REPLACESEL.
+	// Disable intermediate redraw to avoid corrupt/overlapping glyphs when
+	// a fast-running task emits many progress messages.
 	s = strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\r", "\n")
 	s = strings.ReplaceAll(s, "\n", "\r\n")
-	addition := "\r\n" + s
-	ui.logs += addition
+	ui.logs += "\r\n" + s
 	if len(ui.logs) > 40000 {
-		ui.logs = ui.logs[len(ui.logs)-26000:]
-		invoke(sendMessage, ui.output, wmSetText, 0, uintptr(unsafe.Pointer(u16(ui.logs))))
-	} else {
-		invoke(sendMessage, ui.output, emSetSel, ^uintptr(0), ^uintptr(0))
-		invoke(sendMessage, ui.output, emReplaceSel, 1, uintptr(unsafe.Pointer(u16(addition))))
+		runes := []rune(ui.logs)
+		if len(runes) > 13000 {
+			ui.logs = string(runes[len(runes)-13000:])
+		}
 	}
+	invoke(sendMessage, ui.output, wmSetRedraw, 0, 0)
+	invoke(sendMessage, ui.output, wmSetText, 0, uintptr(unsafe.Pointer(u16(ui.logs))))
+	invoke(sendMessage, ui.output, emSetSel, ^uintptr(0), ^uintptr(0))
 	invoke(sendMessage, ui.output, emScrollCaret, 0, 0)
+	invoke(sendMessage, ui.output, wmSetRedraw, 1, 0)
+	invoke(user32.NewProc("InvalidateRect"), ui.output, 0, 1)
 }
 
 func refreshList() {
@@ -432,7 +440,7 @@ func displayZIPName(path string) string {
 func onButton(id int) {
 	if id == 112 {
 		ui.advanced = !ui.advanced
-		for _, adv := range []int{106, 107, 108, 109, 110} {
+		for _, adv := range []int{106, 107, 108, 109, 110, 114} {
 			if ui.advanced {
 				invoke(showWindow, ui.buttons[adv], 1)
 			} else {
@@ -451,6 +459,22 @@ func onButton(id int) {
 	}
 	if id == 110 {
 		refreshList()
+		return
+	}
+	if id == 114 {
+		if ui.busy {
+			return
+		}
+		if msgbox(ui.main, "Θα επανέλθει στη λίστα το τελευταίο αφαιρεμένο έργο. Συνέχεια;", "Επαναφορά έργου", mbYesNo|0x40) != idYes {
+			return
+		}
+		p, err := ui.store.RestoreLastRemoved()
+		if err != nil {
+			msgbox(ui.main, "Η επαναφορά απέτυχε: "+err.Error(), "Επαναφορά έργου", 0x10)
+			return
+		}
+		refreshList()
+		appendOutput("Επαναφέρθηκε το έργο: " + p.Name)
 		return
 	}
 	if ui.busy {
@@ -486,6 +510,22 @@ func onButton(id int) {
 		return
 	}
 	switch id {
+	case 113:
+		p, _, err := ui.store.Get(pID)
+		if err != nil {
+			msgbox(ui.main, "Το έργο δεν βρέθηκε: "+err.Error(), "Αφαίρεση έργου", 0x10)
+			return
+		}
+		if msgbox(ui.main, "Αφαίρεση του έργου «"+p.Name+"» από τη λίστα;\n\nΤα αρχεία, οι εκδόσεις και οι αναφορές διατηρούνται και μπορείτε να το επαναφέρετε.", "Επιβεβαίωση αφαίρεσης", mbYesNo|mbIconWarning) != idYes {
+			return
+		}
+		where, err := ui.store.ArchiveProject(pID)
+		if err != nil {
+			msgbox(ui.main, "Δεν έγινε αφαίρεση: "+err.Error(), "Αφαίρεση έργου", 0x10)
+			return
+		}
+		refreshList()
+		appendOutput("Το έργο «"+p.Name+"» αφαιρέθηκε από τη λίστα και κρατήθηκε ως αντίγραφο: "+where)
 	case 102:
 		p, m, e := ui.store.Get(pID)
 		if e != nil {
