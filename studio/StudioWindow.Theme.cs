@@ -76,8 +76,8 @@ internal sealed partial class StudioWindow
             CornerRadius = new CornerRadius(10),
             Padding = new Thickness(8, 8, 8, 8)
         };
-        b.Shadow = new ThemeShadow();
-        b.Translation = new Vector3(0, 0, accent ? 20 : 10);
+        // Render text on the native XAML surface without elevated composition layers.
+        // Gradient and border retain visual depth without glyph resampling.
         // Never scale a text-bearing button: fractional compositor scaling can
         // briefly resample glyphs and make them look blurry during hover/press.
         // Retain Fluent feedback through a brighter outline and 3D ThemeShadow.
@@ -103,9 +103,7 @@ internal sealed partial class StudioWindow
             BorderBrush = CardOutline,
             BorderThickness = new Thickness(1.2),
             Padding = pad ?? new Thickness(18),
-            Child = body,
-            Shadow = new ThemeShadow(),
-            Translation = new Vector3(0, 0, 16)
+            Child = body
         };
     }
 

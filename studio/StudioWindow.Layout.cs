@@ -178,8 +178,6 @@ internal sealed partial class StudioWindow
             BorderBrush = Blue,
             BorderThickness = new Thickness(2),
             CornerRadius = new CornerRadius(13),
-            Shadow = new ThemeShadow(),
-            Translation = new Vector3(0, 0, 22),
             Child = new TextBlock
             {
                 Text = "ΚΠ", Foreground = Ink, FontSize = 27,
