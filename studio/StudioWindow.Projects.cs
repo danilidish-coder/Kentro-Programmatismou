@@ -24,7 +24,7 @@ internal sealed partial class StudioWindow
     private void AddLog(string entry)
     {
         var value = new TextBlock {
-            Text = entry, FontFamily = new FontFamily("Segoe UI Variable"), FontSize = 13,
+            Text = entry, FontFamily = new FontFamily("Segoe UI"), FontSize = 13,
             Foreground = Ink, TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(10, 7, 10, 7)
         };

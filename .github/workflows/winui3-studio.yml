@@ -103,3 +103,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ github.ref_name }}" "./single/Kentro_Programmatismou.exe" --repo "${{ github.repository }}" --title "Κέντρο Προγραμματισμού · ${{ github.ref_name }}" --generate-notes --verify-tag
+
+      # Preview delivery is opt-in per commit; users download the EXE directly,
+      # while main and stable releases remain untouched.
+      - name: Publish verified preview as directly downloadable EXE
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/feature/winui3-modern-studio' && contains(github.event.head_commit.message, '[deliver-exe]')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $sha = "${{ github.sha }}".Substring(0, 12)
+          $tag = "studio-test-$sha"
+          gh release create $tag "./single/Kentro_Programmatismou.exe" --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "Κέντρο Προγραμματισμού · Δοκιμαστική $sha" --notes "Δοκιμαστική έκδοση WinUI 3 για καθαρή γραμματοσειρά στα Windows 10. Ένα EXE, χωρίς ZIP. Η σταθερή έκδοση δεν αντικαθίσταται." --prerelease

@@ -48,7 +48,7 @@ internal sealed partial class StudioWindow
         return new TextBlock
         {
             Text = value,
-            FontFamily = new FontFamily("Segoe UI Variable"),
+            FontFamily = new FontFamily("Segoe UI"),
             FontSize = size,
             FontWeight = strong
                 ? Microsoft.UI.Text.FontWeights.Bold
@@ -66,7 +66,7 @@ internal sealed partial class StudioWindow
             Content = value,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Height = 51,
-            FontFamily = new FontFamily("Segoe UI Variable"),
+            FontFamily = new FontFamily("Segoe UI"),
             FontSize = 14,
             FontWeight = Microsoft.UI.Text.FontWeights.Bold,
             Background = normal,
