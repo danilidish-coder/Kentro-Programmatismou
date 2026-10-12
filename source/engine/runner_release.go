@@ -1,0 +1,252 @@
+package engine
+
+import (
+	"archive/zip"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"encoding/xml"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+)
+
+func (s *Store) LatestRun(id string) (Run, error) {
+	var r Run
+	root, e := s.Base(id)
+	if e != nil {
+		return r, e
+	}
+	entries, e := os.ReadDir(filepath.Join(root, "runs"))
+	if e != nil {
+		return r, e
+	}
+	type rec struct{ run Run }
+	all := []Run{}
+	for _, d := range entries {
+		if !d.IsDir() {
+			continue
+		}
+		b, e := os.ReadFile(filepath.Join(root, "runs", d.Name(), "results.json"))
+		if e != nil {
+			continue
+		}
+		var x Run
+		if json.Unmarshal(b, &x) == nil && x.ProjectID == id {
+			all = append(all, x)
+		}
+	}
+	if len(all) == 0 {
+		return r, errors.New("Δεν υπάρχουν ακόμη αποτελέσματα")
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].Started.After(all[j].Started) })
+	return all[0], nil
+}
+func (s *Store) Approve(id string) (string, error) {
+	p, _, e := s.Get(id)
+	if e != nil {
+		return "", e
+	}
+	run, e := s.LatestRun(id)
+	if e != nil {
+		return "", e
+	}
+	current, e := HashTree(filepath.Join(s.Root, "projects", id, "source"))
+	if e != nil {
+		return "", e
+	}
+	if run.SourceHash != current {
+		return "", errors.New("Ο κώδικας άλλαξε μετά τα τεστ — απαιτούνται νέοι έλεγχοι")
+	}
+	if IsBlocked(run) {
+		return "", errors.New("Αποκλείεται η σταθερή έκδοση: αποτυχία ή έλλειψη υποχρεωτικών τεστ")
+	}
+	root := filepath.Join(s.Root, "projects", id)
+	dst := filepath.Join(root, "stable", run.ID)
+	if exists(dst) {
+		return dst, nil
+	}
+	stage := dst + ".new"
+	os.RemoveAll(stage)
+	if e = copyTree(filepath.Join(root, "source"), filepath.Join(stage, "source")); e != nil {
+		os.RemoveAll(stage)
+		return "", e
+	}
+	if exists(filepath.Join(root, "runs", run.ID, "artifacts")) {
+		if e = copyTree(filepath.Join(root, "runs", run.ID, "artifacts"), filepath.Join(stage, "artifacts")); e != nil {
+			os.RemoveAll(stage)
+			return "", e
+		}
+	}
+	verifiedHash, verr := HashTree(filepath.Join(stage, "source"))
+	if verr != nil || verifiedHash != run.SourceHash {
+		os.RemoveAll(stage)
+		return "", errors.New("Αποτυχία επαλήθευσης πηγών σταθερής έκδοσης")
+	}
+	if e = atomicJSON(filepath.Join(stage, "approval.json"), map[string]any{"project": p, "run": run}); e != nil {
+		os.RemoveAll(stage)
+		return "", e
+	}
+	if e = os.Rename(stage, dst); e != nil {
+		os.RemoveAll(stage)
+		return "", e
+	}
+	return dst, nil
+}
+func (s *Store) Backup(id string) (string, error) {
+	p, _, e := s.Get(id)
+	if e != nil {
+		return "", e
+	}
+	src := filepath.Join(s.Root, "projects", id, "source")
+	h, e := HashTree(src)
+	if e != nil {
+		return "", e
+	}
+	dst := filepath.Join(s.Root, "backups", id+"-"+newID())
+	if e = copyTree(src, filepath.Join(dst, "source")); e != nil {
+		os.RemoveAll(dst)
+		return "", e
+	}
+	verify, verr := HashTree(filepath.Join(dst, "source"))
+	if verr != nil || verify != h {
+		os.RemoveAll(dst)
+		return "", errors.New("Αποτυχία επαλήθευσης ακεραιότητας αντιγράφου")
+	}
+	if e = atomicJSON(filepath.Join(dst, "backup.json"), map[string]any{"name": p.Name, "version": p.Version, "language": p.Language, "hash": h, "created": time.Now()}); e != nil {
+		return "", e
+	}
+	return dst, nil
+}
+func (s *Store) RestoreNewest(id string) (Project, error) {
+	var result Project
+	matches, e := filepath.Glob(filepath.Join(s.Root, "backups", id+"-*"))
+	if e != nil {
+		return result, e
+	}
+	if len(matches) == 0 {
+		return result, errors.New("Δεν υπάρχει αντίγραφο για το έργο")
+	}
+	sort.Slice(matches, func(i, j int) bool {
+		a, _ := os.Stat(matches[i])
+		b, _ := os.Stat(matches[j])
+		return a.ModTime().After(b.ModTime())
+	})
+	meta, e := os.ReadFile(filepath.Join(matches[0], "backup.json"))
+	if e != nil {
+		return result, e
+	}
+	var v struct{ Name, Version, Language, Hash string }
+	if e = json.Unmarshal(meta, &v); e != nil {
+		return result, e
+	}
+	got, e := HashTree(filepath.Join(matches[0], "source"))
+	if e != nil {
+		return result, e
+	}
+	if got != v.Hash {
+		return result, errors.New("Το αντίγραφο ασφαλείας αλλοιώθηκε")
+	}
+	result = Project{ID: newID(), Name: v.Name + " (επαναφορά)", Version: v.Version, Language: v.Language, SourceHash: got, ImportedAt: time.Now()}
+	dst := filepath.Join(s.Root, "projects", result.ID)
+	stage := dst + ".new"
+	if e = copyTree(filepath.Join(matches[0], "source"), filepath.Join(stage, "source")); e != nil {
+		os.RemoveAll(stage)
+		return result, e
+	}
+	if e = atomicJSON(filepath.Join(stage, "project.json"), result); e != nil {
+		os.RemoveAll(stage)
+		return result, e
+	}
+	if e = os.Rename(stage, dst); e != nil {
+		os.RemoveAll(stage)
+		return result, e
+	}
+	return result, nil
+}
+func (s *Store) ExportLatest(id string) (string, error) {
+	_, _, e := s.Get(id)
+	if e != nil {
+		return "", e
+	}
+	r, e := s.LatestRun(id)
+	if e != nil {
+		return "", e
+	}
+	dir := filepath.Join(s.Root, "projects", id, "runs", r.ID)
+	out := filepath.Join(s.Root, "reports", id+"-"+r.ID+"-RESULTS.zip")
+	entries := map[string][]byte{}
+	for _, name := range []string{"SUMMARY_GR.txt", "results.json"} {
+		b, e := os.ReadFile(filepath.Join(dir, name))
+		if e != nil {
+			return "", e
+		}
+		entries[name] = b
+	}
+	env, _ := json.MarshalIndent(map[string]any{"host_os": r.HostOS, "app_version": ProductVersion, "run_id": r.ID, "source_sha256": r.SourceHash}, "", "  ")
+	entries["environment.json"] = env
+	artifacts, _ := json.MarshalIndent(r.Artifacts, "", "  ")
+	entries["artifacts/manifest.json"] = artifacts
+	var junit strings.Builder
+	junit.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<testsuite name=\"Κέντρο Προγραμματισμού\">\n")
+	for _, v := range r.Results {
+		junit.WriteString("<testcase name=\"")
+		xml.EscapeText(&junit, []byte(v.Phase+" - "+v.Name))
+		junit.WriteString("\">")
+		if v.Status == "FAIL" {
+			junit.WriteString("<failure>")
+			xml.EscapeText(&junit, []byte(v.Reason))
+			junit.WriteString("</failure>")
+		}
+		if v.Status == "NOT RUN" || v.Status == "CANCELLED" {
+			junit.WriteString("<skipped>")
+			xml.EscapeText(&junit, []byte(v.Reason))
+			junit.WriteString("</skipped>")
+		}
+		junit.WriteString("</testcase>\n")
+	}
+	junit.WriteString("</testsuite>\n")
+	entries["results.junit.xml"] = []byte(junit.String())
+	names := make([]string, 0, len(entries))
+	for name := range entries {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	var sums strings.Builder
+	for _, name := range names {
+		h := sha256.Sum256(entries[name])
+		fmt.Fprintf(&sums, "%s  %s\n", hex.EncodeToString(h[:]), name)
+	}
+	entries["checksums.sha256"] = []byte(sums.String())
+	names = append(names, "checksums.sha256")
+	f, e := os.Create(out)
+	if e != nil {
+		return "", e
+	}
+	z := zip.NewWriter(f)
+	for _, name := range names {
+		w, e := z.Create(name)
+		if e != nil {
+			z.Close()
+			f.Close()
+			return "", e
+		}
+		if _, e = w.Write(entries[name]); e != nil {
+			z.Close()
+			f.Close()
+			return "", e
+		}
+	}
+	if e = z.Close(); e != nil {
+		f.Close()
+		return "", e
+	}
+	if e = f.Close(); e != nil {
+		return "", e
+	}
+	return out, nil
+}
