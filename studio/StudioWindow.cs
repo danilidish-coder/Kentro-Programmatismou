@@ -22,7 +22,7 @@ internal sealed partial class StudioWindow : Window
     private readonly TextBlock logHeading = Label("Αποτελέσματα εργασίας", 18, true);
     private readonly ProgressBar progress = new() { IsIndeterminate = true, Visibility = Visibility.Collapsed, Height = 4 };
     private readonly Button testButton = ActionButton("ΕΛΕΓΧΟΙ", true);
-    private readonly Button buildButton = ActionButton("ΔΗΜΙΟΥΡΓΙΑ EXE", true);
+    private readonly Button buildButton = ActionButton("EXE", true);
     private readonly Button setupButton = ActionButton("SETUP", false);
     private readonly Button reportButton = ActionButton("ΑΝΑΦΟΡΑ", false);
     private readonly Button folderButton = ActionButton("ΦΑΚΕΛΟΣ ΠΡΟΓΡΑΜΜΑΤΟΣ", false);
