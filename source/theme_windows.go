@@ -147,6 +147,8 @@ func colorStatic(dc, hwnd uintptr) uintptr {
         clr=accentColor
     case ui.footer:
         clr=dimColor;brush=brushBG;bg=bgColor
+    case ui.emptyHint:
+        clr=dimColor;brush=brushField;bg=fieldColor
     case ui.output,ui.list:
         brush=brushField;bg=fieldColor
     }
