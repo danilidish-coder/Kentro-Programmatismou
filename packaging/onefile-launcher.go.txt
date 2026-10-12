@@ -1,0 +1,122 @@
+package main
+
+// This native Windows launcher contains the complete self-contained WinUI 3 app
+// and Go engine. It extracts them once to a private per-user versioned cache.
+// The user downloads and starts only THIS exe: no runtime installation or ZIP.
+import (
+    "archive/zip"
+    "bytes"
+    "crypto/sha256"
+    "encoding/hex"
+    "errors"
+    "fmt"
+    "io"
+    "os"
+    "os/exec"
+    "path/filepath"
+    "strings"
+    "syscall"
+    "unsafe"
+    _ "embed"
+)
+
+//go:embed payload.zip
+var payload []byte
+
+const childExe = "Kentro_Programmatismou.exe"
+
+func validInstall(dir string, hash string) bool {
+    marker, err := os.ReadFile(filepath.Join(dir, ".installed-sha256"))
+    if err != nil || strings.TrimSpace(string(marker)) != hash { return false }
+    for _, name := range []string{childExe, "Kentro_Engine.exe"} {
+        fi, e := os.Stat(filepath.Join(dir, name))
+        if e != nil || fi.IsDir() || fi.Size() == 0 { return false }
+    }
+    return true
+}
+
+func unpack(dir string) error {
+    reader, err := zip.NewReader(bytes.NewReader(payload), int64(len(payload)))
+    if err != nil { return fmt.Errorf("invalid embedded application archive: %w", err) }
+    var total uint64
+    for _, item := range reader.File {
+        name := strings.ReplaceAll(item.Name, "\\", "/")
+        clean := filepath.Clean(filepath.FromSlash(name))
+        if name == "" || filepath.IsAbs(clean) || clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) || strings.Contains(name, ":") {
+            return fmt.Errorf("unsafe archive entry: %q", item.Name)
+        }
+        if item.Mode()&os.ModeSymlink != 0 { return fmt.Errorf("archive symlink forbidden: %q", item.Name) }
+        total += item.UncompressedSize64
+        if total > 2*1024*1024*1024 { return errors.New("embedded archive exceeds size limit") }
+        dest := filepath.Join(dir, clean)
+        if item.FileInfo().IsDir() {
+            if err := os.MkdirAll(dest, 0755); err != nil { return err }
+            continue
+        }
+        if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil { return err }
+        in, err := item.Open()
+        if err != nil { return err }
+        out, err := os.OpenFile(dest, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+        if err != nil { in.Close(); return err }
+        n, copyErr := io.Copy(out, in)
+        closeErr := out.Close()
+        in.Close()
+        if copyErr != nil { return fmt.Errorf("unpack %s: %w", item.Name, copyErr) }
+        if closeErr != nil { return closeErr }
+        if n != int64(item.UncompressedSize64) { return fmt.Errorf("unpacked size mismatch %q", item.Name) }
+    }
+    return nil
+}
+
+func prepare() (string, error) {
+    if len(payload) < 100 { return "", errors.New("application payload missing") }
+    hashBytes := sha256.Sum256(payload)
+    hash := hex.EncodeToString(hashBytes[:])
+    cache, err := os.UserCacheDir()
+    if err != nil { return "", err }
+    parent := filepath.Join(cache, "KentroProgrammatismou_Clean", "installed-app")
+    if err = os.MkdirAll(parent, 0755); err != nil { return "", err }
+    dir := filepath.Join(parent, hash)
+    if validInstall(dir, hash) { return dir, nil }
+    temp, err := os.MkdirTemp(parent, ".extract-")
+    if err != nil { return "", err }
+    defer os.RemoveAll(temp)
+    if err = unpack(temp); err != nil { return "", err }
+    if err = os.WriteFile(filepath.Join(temp, ".installed-sha256"), []byte(hash+"\n"), 0644); err != nil { return "", err }
+    if !validInstall(temp, hash) { return "", errors.New("embedded application is incomplete") }
+    if err = os.Rename(temp, dir); err != nil {
+        if validInstall(dir, hash) { return dir, nil }
+        return "", fmt.Errorf("could not activate extracted app: %w", err)
+    }
+    return dir, nil
+}
+
+func run() error {
+    dir, err := prepare()
+    if err != nil { return err }
+    command := exec.Command(filepath.Join(dir, childExe), os.Args[1:]...)
+    command.Dir = dir
+    command.Env = os.Environ()
+    if err := command.Start(); err != nil { return fmt.Errorf("could not open Windows application: %w", err) }
+    if err := command.Wait(); err != nil { return fmt.Errorf("application exited unexpectedly: %w", err) }
+    return nil
+}
+
+func fatal(err error) {
+    message := "Το Κέντρο Προγραμματισμού δεν μπόρεσε να ξεκινήσει.\n\n" + err.Error()
+    folder, e := os.UserCacheDir()
+    if e == nil {
+        folder = filepath.Join(folder, "KentroProgrammatismou_Clean", "diagnostics")
+        if os.MkdirAll(folder, 0700) == nil {
+            _ = os.WriteFile(filepath.Join(folder, "launcher-error.txt"), []byte(message), 0600)
+        }
+    }
+    title, _ := syscall.UTF16PtrFromString("Κέντρο Προγραμματισμού — Σφάλμα")
+    body, _ := syscall.UTF16PtrFromString(message)
+    proc := syscall.NewLazyDLL("user32.dll").NewProc("MessageBoxW")
+    proc.Call(0, uintptr(unsafe.Pointer(body)), uintptr(unsafe.Pointer(title)), 0x10)
+}
+
+func main() {
+    if err := run(); err != nil { fatal(err); os.Exit(1) }
+}
