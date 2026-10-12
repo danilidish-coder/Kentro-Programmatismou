@@ -13,6 +13,7 @@ public static class UIMessage {
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hwnd, System.Text.StringBuilder buffer, int maxCount);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
   [DllImport("user32.dll")] public static extern int GetDlgCtrlID(IntPtr hwnd);
+  [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr parent, int id);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr hwnd, uint message, IntPtr wp, System.Text.StringBuilder lp);
   [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hwnd, uint message, IntPtr wp, IntPtr lp);
   [StructLayout(LayoutKind.Sequential)] public struct Rect { public int L,T,R,B; }
@@ -64,20 +65,15 @@ try {
     } catch { Trace "NOT RUN: screenshot unsupported on runner: $($_.Exception.Message)" }
 
     # Verify four visible stages and non-overlapping native controls.
-    function Get-ById([string]$cls,[int]$id) {
-        $after = [IntPtr]::Zero
-        while ($true) {
-            $next = [UIMessage]::FindWindowEx($hwnd,$after,$cls,$null)
-            if ($next -eq [IntPtr]::Zero) { break }
-            if ([UIMessage]::GetDlgCtrlID($next) -eq $id) { return $next }
-            $after = $next
-        }
-        throw "FAIL: missing control ID $id"
+    function Get-ById([int]$id) {
+        $handle=[UIMessage]::GetDlgItem($hwnd,$id)
+        if($handle -eq [IntPtr]::Zero){throw "FAIL: GetDlgItem cannot find button $id"}
+        return $handle
     }
     $ordered=@(103,115,116)
     $controlRects=@{}
     foreach($id in $ordered){
-        $handle = Get-ById 'Button' $id
+        $handle = Get-ById $id
         $rc2=[UIMessage+Rect]::new()
         if(-not [UIMessage]::GetWindowRect($handle,[ref]$rc2)){throw "FAIL: stage $id has no rectangle"}
         $controlRects[$id]=$rc2
