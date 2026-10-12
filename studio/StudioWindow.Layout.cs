@@ -85,7 +85,7 @@ internal sealed partial class StudioWindow
         Grid.SetRow(heroCard, 0);
         right.Children.Add(heroCard);
 
-        var compact = AppWindow.Size.Width < 1250;
+        var compact = AppWindow.Size.Width < 810;
         var phases = new Grid { ColumnSpacing = 12, RowSpacing = 10 };
         for (var i = 0; i < (compact ? 2 : 4); i++)
             phases.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
