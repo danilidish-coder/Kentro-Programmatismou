@@ -276,6 +276,7 @@ func missingBuildRequirement(ctx context.Context, work string, step Step) string
 		check, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		cmd := exec.CommandContext(check, python, "-c", "import importlib.util,sys;sys.exit(0 if importlib.util.find_spec('PyInstaller') else 5)")
+		hideToolConsole(cmd)
 		cmd.Dir = work
 		cmd.Env = offlineEnv()
 		if err = cmd.Run(); err != nil {
@@ -289,15 +290,17 @@ func missingBuildRequirement(ctx context.Context, work string, step Step) string
 // after the interval is PASS; unexpected early termination is FAIL.
 // PyInstaller one-file EXEs spawn children: kill the entire Windows process tree.
 func terminateProcessTree(cmd *exec.Cmd) {
-    if cmd == nil || cmd.Process == nil {
-        return
-    }
-    if runtime.GOOS == "windows" {
-        ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-        defer cancel()
-        _ = exec.CommandContext(ctx, "taskkill.exe", "/F", "/T", "/PID", strconv.Itoa(cmd.Process.Pid)).Run()
-    }
-    _ = cmd.Process.Kill()
+	if cmd == nil || cmd.Process == nil {
+		return
+	}
+	if runtime.GOOS == "windows" {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		killer := exec.CommandContext(ctx, "taskkill.exe", "/F", "/T", "/PID", strconv.Itoa(cmd.Process.Pid))
+		hideToolConsole(killer)
+		_ = killer.Run()
+	}
+	_ = cmd.Process.Kill()
 }
 
 func runGUISmoke(ctx context.Context, work string, step Step) Result {
@@ -341,9 +344,9 @@ func runGUISmoke(ctx context.Context, work string, step Step) Result {
 		r.Reason = "Ακυρώθηκε ο έλεγχος εκκίνησης"
 	}
 	if runtime.GOOS == "windows" {
-        time.Sleep(350 * time.Millisecond)
-    }
-    r.DurationMS = time.Since(start).Milliseconds()
+		time.Sleep(350 * time.Millisecond)
+	}
+	r.DurationMS = time.Since(start).Milliseconds()
 	return r
 }
 
@@ -401,6 +404,7 @@ func runStep(ctx context.Context, work, logDir, phase, basename string, t Step) 
 	ctx2, cancel := context.WithTimeout(ctx, time.Duration(sec)*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx2, exe, args...)
+	hideToolConsole(cmd)
 	cmd.Dir = work
 	cmd.Env = offlineEnv()
 	var b bytes.Buffer
@@ -587,6 +591,7 @@ func restartStress(ctx context.Context, work, logs string, i int, sp StressSpec)
 			return r
 		}
 		cmd := exec.Command(exe, args...)
+		hideToolConsole(cmd)
 		cmd.Dir = work
 		cmd.Env = offlineEnv()
 		cmd.Stdout = io.Discard

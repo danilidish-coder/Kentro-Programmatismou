@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const ProductVersion = "1.0.0-beta4"
+const ProductVersion = "1.0.0-beta5"
 
 type Step struct {
 	Name           string   `json:"name"`
@@ -106,7 +106,7 @@ func NewStore(root string) (*Store, error) {
 	if root == "" {
 		root = DefaultRoot()
 	}
-	for _, dir := range []string{"projects", "reports", "backups"} {
+	for _, dir := range []string{"projects", "reports", "backups", "trash"} {
 		if e := os.MkdirAll(filepath.Join(root, dir), 0700); e != nil {
 			return nil, e
 		}

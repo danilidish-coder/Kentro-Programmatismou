@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"kentro.local/programmatismou/engine"
 	"net/url"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -41,6 +42,7 @@ const (
 	wmSetText          = 0x000C
 	wmApp              = 0x8000
 	wsOverlappedWindow = 0x00CF0000
+	wsClipChildren     = 0x02000000
 	wsChildVisible     = 0x50000000
 	wsBorder           = 0x00800000
 	esMultiline        = 0x0004
@@ -51,6 +53,9 @@ const (
 	lbResetContent     = 0x0184
 	lbGetCurSel        = 0x0188
 	lbSetCurSel        = 0x0186
+	lbDeleteString     = 0x0182
+	lbGetCount         = 0x018B
+	lbSetTopIndex      = 0x0197
 	mbYesNo            = 0x00000004
 	mbIconWarning      = 0x30
 	idYes              = 6
@@ -127,6 +132,7 @@ var ui struct {
 	advanced                                                                                    bool
 	started                                                                                     time.Time
 	current                                                                                     string
+	completedPass, completedFail, completedSkipped                                              int
 }
 
 func startApp() {
@@ -145,7 +151,7 @@ func startApp() {
 		msgbox(0, "Αδυναμία εκκίνησης του παραθύρου", "Σφάλμα", 0x10)
 		return
 	}
-	ui.main = invoke(createWindow, 0, uintptr(unsafe.Pointer(cls)), uintptr(unsafe.Pointer(u16("Κέντρο Προγραμματισμού"))), wsOverlappedWindow, 110, 80, 1120, 790, 0, 0, inst, 0)
+	ui.main = invoke(createWindow, 0, uintptr(unsafe.Pointer(cls)), uintptr(unsafe.Pointer(u16("Κέντρο Προγραμματισμού"))), wsOverlappedWindow|wsClipChildren, 110, 80, 1120, 790, 0, 0, inst, 0)
 	if ui.main == 0 {
 		return
 	}
@@ -182,38 +188,47 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		invoke(sendMessage, ui.brand, wmSetFont, fontHeading, 1)
 		ui.subhead = control("STATIC", "ΜΟΝΟ ΣΤΟΝ ΥΠΟΛΟΓΙΣΤΗ ΣΟΥ  •  ΕΚΔΟΣΗ "+engine.ProductVersion, wsChildVisible, 0, 86, 61, 800, 24)
 		ui.projectTitle = control("STATIC", "ΤΑ ΕΡΓΑ ΜΟΥ", wsChildVisible, 0, 28, 105, 250, 28)
-		ui.actionTitle = control("STATIC", "ΑΚΟΛΟΥΘΗΣΤΕ ΤΑ ΒΗΜΑΤΑ", wsChildVisible, 0, 345, 105, 660, 28)
-		ui.resultsTitle = control("STATIC", "ΤΙ ΣΥΜΒΑΙΝΕΙ ΣΤΟ ΕΡΓΟ ΜΟΥ", wsChildVisible, 0, 345, 452, 660, 27)
+		ui.actionTitle = control("STATIC", "ΔΗΜΙΟΥΡΓΙΑ ΠΡΟΓΡΑΜΜΑΤΟΣ", wsChildVisible, 0, 345, 105, 660, 28)
+		ui.resultsTitle = control("STATIC", "ΑΠΟΤΕΛΕΣΜΑΤΑ ΕΛΕΓΧΟΥ", wsChildVisible, 0, 345, 452, 660, 27)
 		ui.footer = control("STATIC", "Τοπική λειτουργία • Τα έργα παραμένουν στον υπολογιστή", wsChildVisible, 0, 28, 690, 860, 28)
 		ui.list = control("LISTBOX", "", wsChildVisible|wsTabStop|wsVscroll|0x0001|0x0040, 90, 28, 200, 275, 450)
+		// Only the actions requested by a non-programmer are on the home screen.
+		// Backup/version management still happens inside the local engine.
 		btns := []struct {
 			id    int
 			label string
 		}{
-			{101, "＋  Εισαγωγή έργου ZIP"}, {102, "◫  Ανάλυση έργου"}, {103, "▶  Εκτέλεση όλων των ελέγχων"},
-			{104, "▤  Προβολή αποτελεσμάτων"}, {105, "⇧  Εξαγωγή αναφοράς"}, {106, "▣  Αντίγραφο ασφαλείας"},
-			{107, "↶  Επαναφορά αντιγράφου"}, {108, "✓  Έγκριση σταθερής έκδοσης"}, {109, "▱  Άνοιγμα φακέλου έργου"}, {110, "↻  Ανανέωση λίστας"},
-			{111, "Ακύρωση δοκιμών"}, {112, "Περισσότερες δυνατότητες"},
+			{101, "Εισαγωγή αρχείου ZIP"},
+			{103, "Δοκιμές και δημιουργία EXE"},
+			{104, "Προβολή αποτελεσμάτων"},
+			{105, "Αναφορά για το ChatGPT"},
+			{111, "Ακύρωση δοκιμών"},
+			{113, "Αφαίρεση έργου"},
+			{114, "Επαναφορά αφαιρεμένου"},
 		}
 		for _, v := range btns {
 			ui.buttons[v.id] = control("BUTTON", v.label, wsChildVisible|wsTabStop|bsOwnerDraw, v.id, 0, 0, 10, 10)
 		}
 		invoke(enableWindow, ui.buttons[111], 0)
-		for _, id := range []int{106, 107, 108, 109, 110} {
-			invoke(showWindow, ui.buttons[id], 0)
-		}
-		ui.output = control("EDIT", "Επιλέξτε αρχείο ZIP για εισαγωγή ή έργο από τη λίστα.", wsChildVisible|wsVscroll|esMultiline|esAutoVscroll|esReadonly, 91, 345, 490, 680, 230)
-		ui.logs = "Καλώς ήρθατε στο Κέντρο Προγραμματισμού.\r\n\r\nΒήμα 1: Εισάγετε το έργο σας (ZIP).\r\nΒήμα 2: Δείτε τι χρειάζεται το έργο.\r\nΒήμα 3: Εκτελέστε ελέγχους και κατασκευή.\r\nΒήμα 4: Δείτε τα αποτελέσματα."
+		ui.output = control("LISTBOX", "", wsChildVisible|wsVscroll|0x0040, 91, 345, 390, 680, 230)
 		invoke(sendMessage, ui.output, wmSetFont, fontBody, 1)
-		invoke(sendMessage, ui.output, wmSetText, 0, uintptr(unsafe.Pointer(u16(ui.logs))))
+		appendOutput("Εισάγετε ZIP, επιλέξτε έργο και πατήστε Δοκιμές και δημιουργία EXE.")
 		invoke(setTimer, hwnd, 1, 1000, 0)
 		layout(hwnd)
 		refreshList()
 		return 0
+	case wmApp + 9:
+		// Test-only: each message must occupy its own list row.
+		if os.Getenv("KENTRO_UI_SMOKE_TEST") == "1" {
+			for i := 0; i < 34; i++ {
+				appendOutput(fmt.Sprintf("Οπτικός έλεγχος %02d: Σωστή εμφάνιση", i+1))
+			}
+		}
+		return 0
 	case wmTimer:
 		if ui.busy {
 			elapsed := time.Since(ui.started).Round(time.Second)
-			caption := fmt.Sprintf("Εκτελούνται δοκιμές • %s • %s", elapsed, ui.current)
+			caption := fmt.Sprintf("Εκτελείται έλεγχος • %s • %d επιτυχίες • %d προβλήματα", elapsed, ui.completedPass, ui.completedFail)
 			invoke(sendMessage, ui.footer, wmSetText, 0, uintptr(unsafe.Pointer(u16(caption))))
 		}
 		return 0
@@ -258,8 +273,18 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		finished := false
 		for _, ev := range events {
 			if ev.line != "" {
-				if strings.HasPrefix(ev.line, "TEST:") || strings.HasPrefix(ev.line, "STRESS:") || strings.HasPrefix(ev.line, "BUILD:") || strings.HasPrefix(ev.line, "SMOKE:") || strings.HasPrefix(ev.line, "VISUAL:") {
+				if strings.HasPrefix(ev.line, "TEST:") || strings.HasPrefix(ev.line, "STRESS:") || strings.HasPrefix(ev.line, "BUILD:") || strings.HasPrefix(ev.line, "SMOKE:") || strings.HasPrefix(ev.line, "VISUAL:") || strings.HasPrefix(ev.line, "INTEGRITY:") {
 					ui.current = ev.line
+					if strings.HasSuffix(ev.line, " — PASS") {
+						ui.completedPass++
+						continue // Technical PASS spam belongs in the full report, not the home page.
+					}
+					if strings.Contains(ev.line, " — FAIL") {
+						ui.completedFail++
+					}
+					if strings.Contains(ev.line, " — NOT RUN") {
+						ui.completedSkipped++
+					}
 				}
 				appendOutput(ev.line)
 			}
@@ -275,7 +300,7 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		}
 		if finished {
 			ui.busy = false
-			invoke(sendMessage, ui.footer, wmSetText, 0, uintptr(unsafe.Pointer(u16("Η διαδικασία ολοκληρώθηκε • Δείτε τα αποτελέσματα (Βήμα 4)"))))
+			invoke(sendMessage, ui.footer, wmSetText, 0, uintptr(unsafe.Pointer(u16("Η εργασία ολοκληρώθηκε • Πατήστε «Αποτελέσματα»"))))
 			if ui.cancel != nil {
 				ui.cancel()
 				ui.cancel = nil
@@ -311,45 +336,25 @@ func layout(hwnd uintptr) {
 	if h < 630 {
 		h = 630
 	}
-	mainX := 345
-	contentW := w - mainX - 28
+	const mainX = 332
+	contentW := w - mainX - 26
 	half := (contentW - 12) / 2
-	resultsTop := 378
-	if ui.advanced {
-		resultsTop = 540
-	}
-	invoke(moveWindow, ui.brand, 27, 21, 43, 40, 1)
-	invoke(moveWindow, ui.header, 85, 18, uintptr(w-100), 42, 1)
-	invoke(moveWindow, ui.subhead, 87, 61, uintptr(w-110), 25, 1)
-	invoke(moveWindow, ui.projectTitle, 28, 113, 285, 28, 1)
-	invoke(moveWindow, ui.actionTitle, uintptr(mainX), 113, uintptr(contentW), 28, 1)
-	invoke(moveWindow, ui.resultsTitle, uintptr(mainX), uintptr(resultsTop), uintptr(contentW), 28, 1)
-	invoke(moveWindow, ui.list, 28, 202, 275, uintptr(h-285), 1)
-	invoke(moveWindow, ui.footer, 28, uintptr(h-39), uintptr(w-58), 26, 1)
-	invoke(moveWindow, ui.buttons[101], 28, 148, 275, 47, 1)
-	// The main flow shows only four steps after ZIP import.
-	for i, id := range []int{102, 103, 104, 105} {
-		col, row := i%2, i/2
-		x := mainX + col*(half+12)
-		y := 149 + row*73
-		invoke(moveWindow, ui.buttons[id], uintptr(x), uintptr(y), uintptr(half), 62, 1)
-	}
-	invoke(moveWindow, ui.buttons[112], uintptr(mainX), 296, uintptr(half), 48, 1)
-	invoke(moveWindow, ui.buttons[111], uintptr(mainX+half+12), 296, uintptr(half), 48, 1)
-	if ui.advanced {
-		for i, id := range []int{106, 107, 108, 109, 110} {
-			col, row := i%2, i/2
-			x := mainX + col*(half+12)
-			y := 359 + row*51
-			invoke(moveWindow, ui.buttons[id], uintptr(x), uintptr(y), uintptr(half), 43, 1)
-		}
-	}
-	outY := resultsTop + 39
-	outH := h - outY - 65
-	if outH < 82 {
-		outH = 82
-	}
-	invoke(moveWindow, ui.output, uintptr(mainX+14), uintptr(outY), uintptr(contentW-28), uintptr(outH), 1)
+	invoke(moveWindow, ui.brand, 24, 20, 44, 40, 1)
+	invoke(moveWindow, ui.header, 80, 18, uintptr(w-95), 42, 1)
+	invoke(moveWindow, ui.subhead, 81, 61, uintptr(w-100), 25, 1)
+	invoke(moveWindow, ui.projectTitle, 26, 121, 270, 26, 1)
+	invoke(moveWindow, ui.actionTitle, uintptr(mainX), 121, uintptr(contentW), 27, 1)
+	invoke(moveWindow, ui.buttons[101], 24, 154, 278, 58, 1)
+	invoke(moveWindow, ui.list, 24, 226, 278, uintptr(h-425), 1)
+	invoke(moveWindow, ui.buttons[113], 24, uintptr(h-177), 278, 47, 1)
+	invoke(moveWindow, ui.buttons[114], 24, uintptr(h-121), 278, 40, 1)
+	invoke(moveWindow, ui.buttons[103], uintptr(mainX), 156, uintptr(contentW), 77, 1)
+	invoke(moveWindow, ui.buttons[104], uintptr(mainX), 249, uintptr(half), 55, 1)
+	invoke(moveWindow, ui.buttons[105], uintptr(mainX+half+12), 249, uintptr(half), 55, 1)
+	invoke(moveWindow, ui.buttons[111], uintptr(mainX), 314, uintptr(contentW), 38, 1)
+	invoke(moveWindow, ui.resultsTitle, uintptr(mainX), 374, uintptr(contentW), 27, 1)
+	invoke(moveWindow, ui.output, uintptr(mainX+12), 414, uintptr(contentW-24), uintptr(h-492), 1)
+	invoke(moveWindow, ui.footer, 24, uintptr(h-38), uintptr(w-48), 25, 1)
 	invoke(user32.NewProc("InvalidateRect"), hwnd, 0, 1)
 }
 func queue(ev event) {
@@ -359,22 +364,37 @@ func queue(ev event) {
 	invoke(postMessage, ui.main, wmApp+3, 0, 0)
 }
 func appendOutput(s string) {
-	// Append only new text and scroll to the end. Replacing the whole Edit
-	// control on every event previously caused overlapping redraws in Windows.
-	s = strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\r", "\n")
-	s = strings.ReplaceAll(s, "\n", "\r\n")
-	addition := "\r\n" + s
-	ui.logs += addition
-	if len(ui.logs) > 40000 {
-		ui.logs = ui.logs[len(ui.logs)-26000:]
-		invoke(sendMessage, ui.output, wmSetText, 0, uintptr(unsafe.Pointer(u16(ui.logs))))
-	} else {
-		invoke(sendMessage, ui.output, emSetSel, ^uintptr(0), ^uintptr(0))
-		invoke(sendMessage, ui.output, emReplaceSel, 1, uintptr(unsafe.Pointer(u16(addition))))
+	// Native list box draws each outcome in an independent row (no overprinting).
+	if ui.output == 0 {
+		return
 	}
-	invoke(sendMessage, ui.output, emScrollCaret, 0, 0)
+	s = strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\r", "\n")
+	for _, line := range strings.Split(s, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		ui.logs += line + "\n"
+		invoke(sendMessage, ui.output, lbAddString, 0, uintptr(unsafe.Pointer(u16(line))))
+	}
+	count := invoke(sendMessage, ui.output, lbGetCount, 0, 0)
+	for count > 250 {
+		invoke(sendMessage, ui.output, lbDeleteString, 0, 0)
+		count--
+	}
+	if count > 0 {
+		visibleRows := uintptr(13)
+		if count > visibleRows {
+			invoke(sendMessage, ui.output, lbSetTopIndex, count-visibleRows, 0)
+		}
+	}
 }
-
+func clearOutput() {
+	ui.logs = ""
+	if ui.output != 0 {
+		invoke(sendMessage, ui.output, lbResetContent, 0, 0)
+	}
+}
 func refreshList() {
 	if ui.list == 0 || ui.store == nil {
 		return
@@ -412,6 +432,9 @@ func begin(task func(func(string))) {
 	ui.jobCtx, ui.cancel = context.WithCancel(context.Background())
 	ui.started = time.Now()
 	ui.current = "Προετοιμασία"
+	ui.completedPass, ui.completedFail, ui.completedSkipped = 0, 0, 0
+	clearOutput()
+	appendOutput("Εκτελούνται έλεγχοι. Τα πλήρη τεχνικά αποτελέσματα αποθηκεύονται αυτόματα.")
 	for id, bt := range ui.buttons {
 		if id != 111 {
 			invoke(enableWindow, bt, 0)
@@ -430,18 +453,7 @@ func displayZIPName(path string) string {
 }
 
 func onButton(id int) {
-	if id == 112 {
-		ui.advanced = !ui.advanced
-		for _, adv := range []int{106, 107, 108, 109, 110} {
-			if ui.advanced {
-				invoke(showWindow, ui.buttons[adv], 1)
-			} else {
-				invoke(showWindow, ui.buttons[adv], 0)
-			}
-		}
-		layout(ui.main)
-		return
-	}
+
 	if id == 111 {
 		if ui.cancel != nil {
 			ui.cancel()
@@ -481,6 +493,19 @@ func onButton(id int) {
 		})
 		return
 	}
+	if id == 114 {
+		if msgbox(ui.main, "Να επανέλθει στη λίστα το πιο πρόσφατα αφαιρεμένο έργο;", "Επαναφορά έργου", mbYesNo|0x40) != idYes {
+			return
+		}
+		p, e := ui.store.RestoreLatestTrashed()
+		if e != nil {
+			appendOutput("Δεν έγινε επαναφορά: " + e.Error())
+			return
+		}
+		appendOutput("Το έργο επανήλθε: " + p.Name)
+		refreshList()
+		return
+	}
 	pID := selected()
 	if pID == "" {
 		return
@@ -514,6 +539,7 @@ func onButton(id int) {
 				log("ΣΦΑΛΜΑ: " + e.Error())
 				return
 			}
+			log(fmt.Sprintf("Σύνολο: %d επιτυχίες, %d προβλήματα, %d μη εκτελεσμένα", countStatus(r, "PASS"), countNonPass(r, "FAIL"), countStatus(r, "NOT RUN")))
 			if r.Blocked {
 				missing := false
 				for _, step := range r.Results {
@@ -540,7 +566,30 @@ func onButton(id int) {
 			appendOutput(e.Error())
 			return
 		}
-		appendOutput(engine.Summary(r, p))
+		clearOutput()
+		appendOutput("Έργο: " + p.Name)
+		passed, failed, skipped := 0, 0, 0
+		for _, step := range r.Results {
+			switch step.Status {
+			case "PASS":
+				passed++
+			case "NOT RUN":
+				skipped++
+			default:
+				failed++
+			}
+		}
+		appendOutput(fmt.Sprintf("Επιτυχίες: %d  |  Προβλήματα: %d  |  Δεν εκτελέστηκαν: %d", passed, failed, skipped))
+		for _, step := range r.Results {
+			if step.Status != "PASS" {
+				appendOutput(step.Phase + ": " + step.Name + " — " + step.Status + " " + step.Reason)
+			}
+		}
+		if r.Blocked {
+			appendOutput("Δεν εγκρίθηκε νέα έκδοση: εκκρεμούν υποχρεωτικοί έλεγχοι.")
+		} else {
+			appendOutput("Όλοι οι υποχρεωτικοί έλεγχοι πέτυχαν. Το EXE αποθηκεύτηκε τοπικά.")
+		}
 	case 105:
 		if msgbox(ui.main, "Η αναφορά περιλαμβάνει όνομα έργου, αποτελέσματα και βασικά στοιχεία συστήματος. Δεν περιλαμβάνει πηγαίο κώδικα ή ακατέργαστα logs. Ελέγξτε τη πριν τη στείλετε.", "Εξαγωγή αποτελεσμάτων", mbYesNo|0x40) != idYes {
 			return
@@ -584,12 +633,47 @@ func onButton(id int) {
 				log("Εγκρίθηκε σταθερή έκδοση και αποθηκεύτηκε: " + p)
 			}
 		})
+	case 113:
+		p, _, e := ui.store.Get(pID)
+		if e != nil {
+			appendOutput("Αδυναμία εντοπισμού έργου: " + e.Error())
+			return
+		}
+		question := fmt.Sprintf("Να αφαιρεθεί το έργο «%s» από τη λίστα;\n\nΔεν θα χαθεί: θα φυλαχθεί σε τοπικό φάκελο ανάκτησης. Μπορείτε να το επαναφέρετε με το κουμπί «Επαναφορά αφαιρεμένου».", p.Name)
+		if msgbox(ui.main, question, "Επιβεβαίωση αφαίρεσης", mbYesNo|mbIconWarning) != idYes {
+			return
+		}
+		name, e := ui.store.TrashProject(pID)
+		if e != nil {
+			appendOutput("Δεν αφαιρέθηκε το έργο: " + e.Error())
+			return
+		}
+		appendOutput("Το έργο «" + name + "» αφαιρέθηκε από τη λίστα. Υπάρχει αντίγραφο ανάκτησης.")
+		refreshList()
 	case 109:
 		p, e := ui.store.Base(pID)
 		if e == nil {
 			exec.Command("explorer.exe", p).Start()
 		}
 	}
+}
+func countStatus(r engine.Run, status string) int {
+	count := 0
+	for _, step := range r.Results {
+		if step.Status == status {
+			count++
+		}
+	}
+	return count
+}
+func countNonPass(r engine.Run, status string) int {
+	count := 0
+	for _, step := range r.Results {
+		if step.Status == status || step.Status == "CANCELLED" {
+			count++
+		}
+	}
+	return count
 }
 func openZip() string {
 	// File chooser runs in a separate PowerShell process. A native dialog fault

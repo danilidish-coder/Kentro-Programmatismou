@@ -104,14 +104,11 @@ func paintBackground(hwnd uintptr) {
 		initThemeFonts()
 	}
 	paintFill(dc, rect{0, 0, w, h}, brushBG)
-	paintFill(dc, rect{0, 0, w, 99}, brushTop)
-	if w > 20 && h > 110 {
-		var sidebar = rect{16, 103, 318, h - 53}
-		paintFill(dc, sidebar, brushSide)
-		paintFill(dc, rect{331, 103, w - 16, h - 53}, brushPanel)
-		y := int32(417)
-		if ui.advanced { y = 579 }
-		paintFill(dc, rect{345, y, w - 30, h - 66}, brushField)
+	paintFill(dc, rect{0, 0, w, 101}, brushTop)
+	if w > 20 && h > 120 {
+		paintFill(dc, rect{13, 109, 316, h - 53}, brushSide)
+		paintFill(dc, rect{322, 109, w - 15, h - 53}, brushPanel)
+		paintFill(dc, rect{339, 404, w - 28, h - 66}, brushField)
 	}
 }
 func colorStatic(dc, hwnd uintptr) uintptr {
@@ -136,6 +133,12 @@ func colorStatic(dc, hwnd uintptr) uintptr {
 	case ui.footer:
 		clr = dimColor
 		brush = brushBG
+	case ui.output:
+		// Read-only EDIT sends WM_CTLCOLORSTATIC. Transparent background
+		// over old glyphs caused the illegible overlapping text.
+		invoke(setBkMode, dc, 2)
+		invoke(setBkColor, dc, fieldColor)
+		brush = brushField
 	}
 	invoke(setTextColor, dc, clr)
 	return brush
@@ -193,29 +196,19 @@ func drawButton(d *drawItemStruct) {
 func buttonCaption(id int) string {
 	switch id {
 	case 101:
-		return "1.  ΕΙΣΑΓΩΓΗ ΕΡΓΟΥ"
-	case 102:
-		return "2.  Τι περιέχει το έργο;"
+		return "1.  Εισαγωγή κώδικα ZIP"
 	case 103:
-		return "3.  Δοκιμές και κατασκευή"
+		return "2.  Δοκιμή και δημιουργία EXE"
 	case 104:
-		return "4.  Αποτελέσματα"
+		return "3.  Αποτελέσματα"
 	case 105:
-		return "5.  Αναφορά για το ChatGPT"
-	case 106:
-		return "Αντίγραφο ασφαλείας"
-	case 107:
-		return "Επαναφορά αντιγράφου"
-	case 108:
-		return "Έγκριση έκδοσης"
-	case 109:
-		return "Άνοιγμα φακέλου"
-	case 110:
-		return "Ανανέωση λίστας"
+		return "Αναφορά για ChatGPT"
 	case 111:
-		return "Ακύρωση δοκιμών"
-	case 112:
-		return "Επιπλέον δυνατότητες"
+		return "Ακύρωση εργασίας"
+	case 113:
+		return "Αφαίρεση επιλεγμένου έργου"
+	case 114:
+		return "Επαναφορά αφαιρεμένου"
 	}
 	return ""
 }
