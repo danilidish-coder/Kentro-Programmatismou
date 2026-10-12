@@ -12,7 +12,7 @@ using System.Text.Json;
 namespace KentroStudio;
 
 // Native desktop host: fields and wiring only; layout, theme and actions live in separate modules.
-internal sealed partial class StudioWindow
+internal sealed partial class StudioWindow : Window
 {
     private readonly ListView projects = new();
     private readonly ListView results = new();
