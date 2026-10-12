@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-func begin(task func(func(string))) {
+func begin(stage string, task func(func(string))) {
 	if ui.busy {
 		return
 	}
@@ -22,9 +22,11 @@ func begin(task func(func(string))) {
 	ui.jobCtx, ui.cancel = context.WithCancel(context.Background())
 	ui.started = time.Now()
 	ui.current = "Προετοιμασία"
+	ui.stage = stage
+	showStage("Εκτελείται: " + stage)
 	ui.completedPass, ui.completedFail, ui.completedSkipped = 0, 0, 0
 	clearOutput()
-	appendOutput("Εκτελούνται έλεγχοι. Τα πλήρη τεχνικά αποτελέσματα αποθηκεύονται αυτόματα.")
+	appendOutput("Στάδιο: " + stage + ". Οι ενέργειες εκτελούνται μία-μία και τα αποτελέσματα αποθηκεύονται.")
 	for id, bt := range ui.buttons {
 		if id != 111 {
 			invoke(enableWindow, bt, 0)
@@ -72,7 +74,7 @@ func onButton(id int) {
 		if msgbox(ui.main, message, "Προεπισκόπηση ZIP", mbYesNo|0x40) != idYes {
 			return
 		}
-		begin(func(log func(string)) {
+		begin("Εισαγωγή έργου", func(log func(string)) {
 			log("Παραλαβή έργου: " + displayZIPName(file))
 			p, e := ui.store.ImportZIP(file)
 			if e != nil {
@@ -120,43 +122,52 @@ func onButton(id int) {
 			appendOutput(line)
 		}
 	case 103:
-		if msgbox(ui.main, "Θα εκτελεστεί ο κώδικας του επιλεγμένου έργου στον υπολογιστή σας. Συνεχίζουμε ΜΟΝΟ αν το ZIP προέρχεται από έμπιστη πηγή;", "Επιβεβαίωση εκτέλεσης", mbYesNo|mbIconWarning) != idYes {
-			return
-		}
-		begin(func(log func(string)) {
-			r, e := ui.store.RunAll(ui.jobCtx, pID, log)
-			if e != nil {
-				log("ΣΦΑΛΜΑ: " + e.Error())
-				return
-			}
-			log(fmt.Sprintf("Σύνολο: %d επιτυχίες, %d προβλήματα, %d μη εκτελεσμένα", countStatus(r, "PASS"), countNonPass(r, "FAIL"), countStatus(r, "NOT RUN")))
-			if r.Blocked {
-				missing := false
-				for _, step := range r.Results {
-					if step.Status == "NOT RUN" && strings.Contains(step.Reason, "Δεν βρέθηκε το απαραίτητο εργαλείο") {
-						missing = true
-					}
-				}
-				if missing {
-					log("Χρειάζεται προετοιμασία υπολογιστή: λείπει εργαλείο που απαιτεί το έργο. Δεν σημαίνει ότι ο κώδικας απέτυχε.")
-				}
-				log("Οι υποχρεωτικοί έλεγχοι δεν ολοκληρώθηκαν. Η έκδοση παραμένει δοκιμαστική.")
-			} else {
-				// A non-programmer should not need a second technical approval button.
-                // Promote only after the engine's mandatory gate has passed.
-                stable, err := ui.store.Approve(pID)
-                if err != nil {
-                    log("Οι δοκιμές πέτυχαν αλλά η αποθήκευση EXE δεν ολοκληρώθηκε: " + err.Error())
-                    return
-                }
-                log("Έτοιμη έκδοση: " + stable)
-                exeFolder := filepath.Join(stable, "artifacts")
-                if _, err := os.Stat(exeFolder); err == nil {
-                    log("Ανοίγει ο φάκελος με το ελεγμένο EXE.")
-                    _ = exec.Command("explorer.exe", exeFolder).Start()
-                }
-			}
-		})
+        if msgbox(ui.main,"Θα εκτελεστούν μόνο λειτουργικοί έλεγχοι και stress tests στον υπολογιστή. ΔΕΝ θα κατασκευαστεί EXE. Εκτελούμε κώδικα μόνο από έμπιστη πηγή. Συνέχεια;","Στάδιο 2: Έλεγχοι",mbYesNo|mbIconWarning)!=idYes{return}
+        begin("2/4 · Έλεγχοι και stress tests",func(log func(string)){
+            log("Ξεκινούν λειτουργικοί έλεγχοι και δοκιμές πίεσης. Δεν κατασκευάζεται EXE.")
+            r,e:=ui.store.RunChecks(ui.jobCtx,pID,log)
+            if e!=nil {log("ΣΦΑΛΜΑ: "+e.Error());return}
+            log(fmt.Sprintf("Ολοκληρώθηκαν: %d επιτυχίες, %d προβλήματα, %d παραλείψεις",countStatus(r,"PASS"),countNonPass(r,"FAIL"),countStatus(r,"NOT RUN")))
+            if r.Blocked {
+                log("Οι έλεγχοι ΔΕΝ πέρασαν. Η δημιουργία EXE αποκλείστηκε.")
+            } else {
+                log("Οι έλεγχοι πέρασαν. Μπορείτε να μελετήσετε την αναφορά και μετά να ζητήσετε EXE.")
+            }
+            filename,err:=ui.store.ExportLatest(pID)
+            if err!=nil {log("Σφάλμα αυτόματης αναφοράς: "+err.Error())} else {log("Η αναφορά αποθηκεύτηκε: "+filename)}
+        })
+    case 115:
+        if err:=ui.store.ReadyForBuild(pID);err!=nil{
+            msgbox(ui.main,"Δεν επιτρέπεται ακόμη η δημιουργία EXE. "+err.Error(),"Στάδιο 3: Προϋποθέσεις",0x30)
+            return
+        }
+        if msgbox(ui.main,"Οι λειτουργικοί έλεγχοι και τα stress tests πέρασαν. Να ξεκινήσει ΤΩΡΑ, ως ξεχωριστό στάδιο, η κατασκευή και πραγματική δοκιμή EXE;","Στάδιο 3: Δημιουργία EXE",mbYesNo|0x40)!=idYes{return}
+        begin("3/4 · Δημιουργία και δοκιμή EXE",func(log func(string)){
+            r,e:=ui.store.BuildChecked(ui.jobCtx,pID,log)
+            if e!=nil {log("ΣΦΑΛΜΑ: "+e.Error());return}
+            if r.Blocked{log("Το EXE δεν πέρασε τον τελικό έλεγχο. Δεν εγκρίθηκε καμία έκδοση.");return}
+            stable,err:=ui.store.Approve(pID)
+            if err!=nil {log("Αποτυχία αποθήκευσης εγκεκριμένου EXE: "+err.Error());return}
+            log("Έτοιμο και ελεγμένο EXE: "+stable)
+            exeFolder:=filepath.Join(stable,"artifacts")
+            if _,err:=os.Stat(exeFolder);err==nil{_ = exec.Command("explorer.exe",exeFolder).Start()}
+        })
+    case 116:
+        if err:=ui.store.ReadyForSetup(pID);err!=nil{
+            msgbox(ui.main,err.Error(),"Στάδιο 4: Προαιρετικό Setup",0x40)
+            return
+        }
+        if msgbox(ui.main,"Η κατασκευή Setup είναι προαιρετική και ξεχωριστή. Να ξεκινήσει;","Στάδιο 4: Δημιουργία Setup",mbYesNo|0x40)!=idYes{return}
+        begin("4/4 · Προαιρετικό Setup",func(log func(string)){
+            r,e:=ui.store.BuildSetup(ui.jobCtx,pID,log)
+            if e!=nil {log("ΣΦΑΛΜΑ: "+e.Error());return}
+            if r.Blocked{log("Η δημιουργία Setup απέτυχε. Το ήδη ελεγμένο EXE παραμένει ανέπαφο.");return}
+            base,err:=ui.store.Base(pID)
+            if err!=nil{return}
+            folder:=filepath.Join(base,"runs",r.ID,"artifacts")
+            log("Το Setup βρίσκεται στον φάκελο: "+folder)
+            _ = exec.Command("explorer.exe",folder).Start()
+        })
 	case 104:
 		r, e := ui.store.LatestRun(pID)
 		if e != nil {
@@ -187,16 +198,16 @@ func onButton(id int) {
 				appendOutput(step.Phase + ": " + step.Name + " — " + step.Status + " " + step.Reason)
 			}
 		}
-		if r.Blocked {
-			appendOutput("Δεν εγκρίθηκε νέα έκδοση: εκκρεμούν υποχρεωτικοί έλεγχοι.")
-		} else {
-			appendOutput("Όλοι οι υποχρεωτικοί έλεγχοι πέτυχαν. Το EXE αποθηκεύτηκε τοπικά.")
-		}
+		if r.Stage==engine.StageChecks {
+            if r.Blocked{appendOutput("Στάδιο 2: Οι έλεγχοι απέτυχαν — EXE δεν επιτρέπεται.")} else {appendOutput("Στάδιο 2: Επιτυχής αναφορά. Επόμενο: ξεχωριστή δημιουργία EXE.")}
+        } else if r.Stage==engine.StageBuild {
+            if r.Blocked{appendOutput("Στάδιο 3: Η κατασκευή ή η εκκίνηση απέτυχε.")} else {appendOutput("Στάδιο 3: Το EXE κατασκευάστηκε και ελέγχθηκε.")}
+        } else if r.Blocked {appendOutput("Η εργασία δεν εγκρίθηκε.")} else {appendOutput("Η εργασία ολοκληρώθηκε.")}
 	case 105:
 		if msgbox(ui.main, "Η αναφορά περιλαμβάνει όνομα έργου, αποτελέσματα και βασικά στοιχεία συστήματος. Δεν περιλαμβάνει πηγαίο κώδικα ή ακατέργαστα logs. Ελέγξτε τη πριν τη στείλετε.", "Εξαγωγή αποτελεσμάτων", mbYesNo|0x40) != idYes {
 			return
 		}
-		begin(func(log func(string)) {
+		begin("Αποθήκευση αναφοράς", func(log func(string)) {
 			p, e := ui.store.ExportLatest(pID)
 			if e != nil {
 				log("Αποτυχία εξαγωγής: " + e.Error())
@@ -206,7 +217,7 @@ func onButton(id int) {
 			}
 		})
 	case 106:
-		begin(func(log func(string)) {
+		begin("Αντίγραφο ασφαλείας", func(log func(string)) {
 			p, e := ui.store.Backup(pID)
 			if e != nil {
 				log("Αποτυχία αντιγράφου: " + e.Error())
@@ -218,7 +229,7 @@ func onButton(id int) {
 		if msgbox(ui.main, "Θα δημιουργηθεί ΝΕΟ ανεξάρτητο έργο από το πιο πρόσφατο αντίγραφο. Δεν θα αντικατασταθεί κανένα παλιό αρχείο.", "Επαναφορά", mbYesNo|0x40) != idYes {
 			return
 		}
-		begin(func(log func(string)) {
+		begin("Επαναφορά έργου", func(log func(string)) {
 			p, e := ui.store.RestoreNewest(pID)
 			if e != nil {
 				log("Αποτυχία: " + e.Error())
@@ -227,7 +238,7 @@ func onButton(id int) {
 			}
 		})
 	case 108:
-		begin(func(log func(string)) {
+		begin("Έγκριση σταθερής έκδοσης", func(log func(string)) {
 			p, e := ui.store.Approve(pID)
 			if e != nil {
 				log("ΑΠΟΚΛΕΙΣΜΟΣ: " + e.Error())
