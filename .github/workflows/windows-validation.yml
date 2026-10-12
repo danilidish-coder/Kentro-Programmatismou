@@ -23,6 +23,7 @@ jobs:
       - name: Unit tests - actual Windows
         working-directory: source
         run: |
+          New-Item -ItemType Directory -Force -Path ../build | Out-Null
           go test -count=1 -v ./... 2>&1 | Tee-Object -FilePath ../build/windows-unit.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go vet ./...
