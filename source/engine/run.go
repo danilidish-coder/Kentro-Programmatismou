@@ -198,10 +198,14 @@ func Summary(r Run, p Project) string {
 		}
 		b.WriteString("\n")
 	}
-	if r.Blocked {
+	if r.Stage==StageChecks {
+		if IsChecksBlocked(r) {b.WriteString("ΕΛΕΓΧΟΙ: ΑΠΟΤΥΧΙΑ/ΕΚΚΡΕΜΟΤΗΤΕΣ — ΔΕΝ ΕΠΙΤΡΕΠΕΤΑΙ EXE\n")} else {
+			b.WriteString("ΕΛΕΓΧΟΙ: ΕΠΙΤΥΧΙΑ — ΕΠΟΜΕΝΟ ΒΗΜΑ Η ΞΕΧΩΡΙΣΤΗ ΚΑΤΑΣΚΕΥΗ EXE\n")
+		}
+	} else if r.Stage==StageSetup {
+		if r.Blocked {b.WriteString("SETUP: ΑΠΟΤΥΧΙΑ\n")} else {b.WriteString("SETUP: ΔΗΜΙΟΥΡΓΗΘΗΚΕ\n")}
+	} else if r.Blocked {
 		b.WriteString("ΑΠΟΤΕΛΕΣΜΑ: ΑΠΟΚΛΕΙΣΤΗΚΕ Η ΣΤΑΘΕΡΗ ΕΚΔΟΣΗ\n")
-	} else {
-		b.WriteString("ΑΠΟΤΕΛΕΣΜΑ: ΟΛΟΙ ΟΙ ΥΠΟΧΡΕΩΤΙΚΟΙ ΕΛΕΓΧΟΙ ΠΕΡΑΣΑΝ\n")
-	}
+	} else {b.WriteString("ΑΠΟΤΕΛΕΣΜΑ: ΟΛΟΙ ΟΙ ΥΠΟΧΡΕΩΤΙΚΟΙ ΕΛΕΓΧΟΙ ΠΕΡΑΣΑΝ\n")}
 	return b.String()
 }
