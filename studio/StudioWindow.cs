@@ -92,7 +92,11 @@ internal sealed class StudioWindow : Window
     {
         Title = "Κέντρο Προγραμματισμού · Studio";
         SystemBackdrop = new MicaBackdrop();
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(1210, 810));
+        var display = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(
+            AppWindow.Id, Microsoft.UI.Windowing.DisplayAreaFallback.Primary);
+        var width = Math.Min(1210, Math.Max(700, display.WorkArea.Width - 32));
+        var height = Math.Min(810, Math.Max(500, display.WorkArea.Height - 32));
+        AppWindow.Resize(new Windows.Graphics.SizeInt32(width, height));
         Content = BuildLayout();
 
         projects.SelectionMode = ListViewSelectionMode.Single;
