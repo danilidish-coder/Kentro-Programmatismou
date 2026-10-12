@@ -5,8 +5,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"kentro.local/programmatismou/engine"
+	"net/url"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -24,6 +25,10 @@ const (
 	wmCommand          = 0x0111
 	wmSetFont          = 0x0030
 	wmPaint            = 0x000F
+	wmTimer            = 0x0113
+	emSetSel           = 0x00B1
+	emReplaceSel       = 0x00C2
+	emScrollCaret      = 0x00B7
 	wmEraseBkgnd       = 0x0014
 	wmDrawItem         = 0x002B
 	wmGetMinMaxInfo    = 0x0024
@@ -72,6 +77,8 @@ var (
 	getClientRect    = user32.NewProc("GetClientRect")
 	getModuleHandle  = kernel32.NewProc("GetModuleHandleW")
 	copyNativeMemory = kernel32.NewProc("RtlMoveMemory")
+	setTimer         = user32.NewProc("SetTimer")
+	killTimer        = user32.NewProc("KillTimer")
 	getStockObject   = gdi32.NewProc("GetStockObject")
 	loadCursor       = user32.NewProc("LoadCursorW")
 )
@@ -118,6 +125,8 @@ var ui struct {
 	mu                                                                                          sync.Mutex
 	pending                                                                                     []event
 	advanced                                                                                    bool
+	started                                                                                     time.Time
+	current                                                                                     string
 }
 
 func startApp() {
@@ -196,8 +205,17 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		ui.output = control("EDIT", "Επιλέξτε αρχείο ZIP για εισαγωγή ή έργο από τη λίστα.", wsChildVisible|wsVscroll|esMultiline|esAutoVscroll|esReadonly, 91, 345, 490, 680, 230)
 		ui.logs = "Καλώς ήρθατε στο Κέντρο Προγραμματισμού.\r\n\r\nΒήμα 1: Εισάγετε το έργο σας (ZIP).\r\nΒήμα 2: Δείτε τι χρειάζεται το έργο.\r\nΒήμα 3: Εκτελέστε ελέγχους και κατασκευή.\r\nΒήμα 4: Δείτε τα αποτελέσματα."
 		invoke(sendMessage, ui.output, wmSetFont, fontBody, 1)
+		invoke(sendMessage, ui.output, wmSetText, 0, uintptr(unsafe.Pointer(u16(ui.logs))))
+		invoke(setTimer, hwnd, 1, 1000, 0)
 		layout(hwnd)
 		refreshList()
+		return 0
+	case wmTimer:
+		if ui.busy {
+			elapsed := time.Since(ui.started).Round(time.Second)
+			caption := fmt.Sprintf("Εκτελούνται δοκιμές • %s • %s", elapsed, ui.current)
+			invoke(sendMessage, ui.footer, wmSetText, 0, uintptr(unsafe.Pointer(u16(caption))))
+		}
 		return 0
 	case wmSize:
 		layout(hwnd)
@@ -240,6 +258,9 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		finished := false
 		for _, ev := range events {
 			if ev.line != "" {
+				if strings.HasPrefix(ev.line, "TEST:") || strings.HasPrefix(ev.line, "STRESS:") || strings.HasPrefix(ev.line, "BUILD:") || strings.HasPrefix(ev.line, "SMOKE:") || strings.HasPrefix(ev.line, "VISUAL:") {
+					ui.current = ev.line
+				}
 				appendOutput(ev.line)
 			}
 			if ev.refresh {
@@ -254,6 +275,7 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		}
 		if finished {
 			ui.busy = false
+			invoke(sendMessage, ui.footer, wmSetText, 0, uintptr(unsafe.Pointer(u16("Η διαδικασία ολοκληρώθηκε • Δείτε τα αποτελέσματα (Βήμα 4)"))))
 			if ui.cancel != nil {
 				ui.cancel()
 				ui.cancel = nil
@@ -269,6 +291,7 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		}
 		return 0
 	case wmDestroy:
+		invoke(killTimer, hwnd, 1)
 		releaseTheme()
 		invoke(postQuit, 0)
 		return 0
@@ -304,6 +327,7 @@ func layout(hwnd uintptr) {
 	invoke(moveWindow, ui.list, 28, 202, 275, uintptr(h-285), 1)
 	invoke(moveWindow, ui.footer, 28, uintptr(h-39), uintptr(w-58), 26, 1)
 	invoke(moveWindow, ui.buttons[101], 28, 148, 275, 47, 1)
+	// The main flow shows only four steps after ZIP import.
 	for i, id := range []int{102, 103, 104, 105} {
 		col, row := i%2, i/2
 		x := mainX + col*(half+12)
@@ -335,14 +359,22 @@ func queue(ev event) {
 	invoke(postMessage, ui.main, wmApp+3, 0, 0)
 }
 func appendOutput(s string) {
+	// Append only new text and scroll to the end. Replacing the whole Edit
+	// control on every event previously caused overlapping redraws in Windows.
 	s = strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\r", "\n")
 	s = strings.ReplaceAll(s, "\n", "\r\n")
-	ui.logs += "\r\n" + s
-	if len(ui.logs) > 28000 {
-		ui.logs = ui.logs[len(ui.logs)-25000:]
+	addition := "\r\n" + s
+	ui.logs += addition
+	if len(ui.logs) > 40000 {
+		ui.logs = ui.logs[len(ui.logs)-26000:]
+		invoke(sendMessage, ui.output, wmSetText, 0, uintptr(unsafe.Pointer(u16(ui.logs))))
+	} else {
+		invoke(sendMessage, ui.output, emSetSel, ^uintptr(0), ^uintptr(0))
+		invoke(sendMessage, ui.output, emReplaceSel, 1, uintptr(unsafe.Pointer(u16(addition))))
 	}
-	invoke(sendMessage, ui.output, wmSetText, 0, uintptr(unsafe.Pointer(u16(ui.logs))))
+	invoke(sendMessage, ui.output, emScrollCaret, 0, 0)
 }
+
 func refreshList() {
 	if ui.list == 0 || ui.store == nil {
 		return
@@ -378,6 +410,8 @@ func begin(task func(func(string))) {
 	}
 	ui.busy = true
 	ui.jobCtx, ui.cancel = context.WithCancel(context.Background())
+	ui.started = time.Now()
+	ui.current = "Προετοιμασία"
 	for id, bt := range ui.buttons {
 		if id != 111 {
 			invoke(enableWindow, bt, 0)
@@ -458,7 +492,18 @@ func onButton(id int) {
 			appendOutput(e.Error())
 			return
 		}
-		appendOutput(fmt.Sprintf("Έργο: %s\r\nΓλώσσα: %s\r\nΈκδοση: %s\r\nΔοκιμές: %d\r\nStress: %d\r\nΣυνταγή EXE: %t\r\nΈλεγχος εκκίνησης: %t", p.Name, p.Language, p.Version, len(m.Tests), len(m.Stress), m.Build != nil, m.Smoke != nil))
+		buildText := "Δεν βρέθηκαν ακόμη οδηγίες κατασκευής"
+		if m.Build != nil {
+			buildText = "Η κατασκευή EXE έχει αναγνωριστεί"
+		}
+		startText := "Δεν υπάρχει ακόμη σχέδιο εκκίνησης"
+		if m.Smoke != nil {
+			startText = "Θα ελεγχθεί η πραγματική εκκίνηση"
+		}
+		appendOutput(fmt.Sprintf("Έργο: %s\nΓλώσσα: %s\nΈκδοση: %s\nΛειτουργικοί έλεγχοι: %d\nΔοκιμές πίεσης: %d\nΟπτικοί έλεγχοι: %d\n%s\n%s\n\nΕΡΓΑΛΕΙΑ ΥΠΟΛΟΓΙΣΤΗ:", p.Name, p.Language, p.Version, len(m.Tests), len(m.Stress), len(m.Visual), buildText, startText))
+		for _, line := range engine.Readiness(m) {
+			appendOutput(line)
+		}
 	case 103:
 		if msgbox(ui.main, "Θα εκτελεστεί ο κώδικας του επιλεγμένου έργου στον υπολογιστή σας. Συνεχίζουμε ΜΟΝΟ αν το ZIP προέρχεται από έμπιστη πηγή;", "Επιβεβαίωση εκτέλεσης", mbYesNo|mbIconWarning) != idYes {
 			return
@@ -470,7 +515,7 @@ func onButton(id int) {
 				return
 			}
 			if r.Blocked {
-								missing := false
+				missing := false
 				for _, step := range r.Results {
 					if step.Status == "NOT RUN" && strings.Contains(step.Reason, "Δεν βρέθηκε το απαραίτητο εργαλείο") {
 						missing = true
@@ -551,7 +596,7 @@ func openZip() string {
 	// cannot bring down the main application or corrupt its project store.
 	file, err := chooseZIPWindows()
 	if err != nil {
-		appendOutput("ΣΦΑΛΜΑ επιλογής αρχείου: " + err.Error())
+		appendOutput("Πρόβλημα στην επιλογή αρχείου: " + err.Error())
 		msgbox(ui.main, "Δεν ήταν δυνατή η επιλογή ZIP. Η εφαρμογή παραμένει ανοιχτή.\n\n"+err.Error(), "Επιλογή ZIP", 0x10)
 		return ""
 	}

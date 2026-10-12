@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const ProductVersion = "1.0.0-beta3"
+const ProductVersion = "1.0.0-beta4"
 
 type Step struct {
 	Name           string   `json:"name"`
@@ -47,6 +47,7 @@ type Manifest struct {
 	Stress   []StressSpec `json:"stress"`
 	Build    *Step        `json:"build"`
 	Smoke    *Step        `json:"smoke"`
+	Visual   []Step       `json:"visual,omitempty"`
 }
 
 type Project struct {
@@ -233,6 +234,14 @@ func ValidateManifest(m Manifest) error {
 	}
 	if m.Smoke != nil {
 		if e := validateStep(*m.Smoke); e != nil {
+			return e
+		}
+	}
+	if len(m.Visual) > 12 {
+		return errors.New("Πάρα πολλά οπτικά τεστ")
+	}
+	for _, step := range m.Visual {
+		if e := validateStep(step); e != nil {
 			return e
 		}
 	}
