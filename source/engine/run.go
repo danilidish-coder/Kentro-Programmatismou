@@ -276,6 +276,7 @@ func missingBuildRequirement(ctx context.Context, work string, step Step) string
 		check, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		cmd := exec.CommandContext(check, python, "-c", "import importlib.util,sys;sys.exit(0 if importlib.util.find_spec('PyInstaller') else 5)")
+		prepareChild(cmd)
 		cmd.Dir = work
 		cmd.Env = offlineEnv()
 		if err = cmd.Run(); err != nil {
@@ -309,6 +310,7 @@ func runGUISmoke(ctx context.Context, work string, step Step) Result {
 		return r
 	}
 	cmd := exec.Command(exe, args...)
+	prepareChild(cmd)
 	cmd.Dir = work
 	cmd.Env = offlineEnv()
 	start := time.Now()
@@ -401,6 +403,7 @@ func runStep(ctx context.Context, work, logDir, phase, basename string, t Step) 
 	ctx2, cancel := context.WithTimeout(ctx, time.Duration(sec)*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx2, exe, args...)
+	prepareChild(cmd)
 	cmd.Dir = work
 	cmd.Env = offlineEnv()
 	var b bytes.Buffer
@@ -587,6 +590,7 @@ func restartStress(ctx context.Context, work, logs string, i int, sp StressSpec)
 			return r
 		}
 		cmd := exec.Command(exe, args...)
+		prepareChild(cmd)
 		cmd.Dir = work
 		cmd.Env = offlineEnv()
 		cmd.Stdout = io.Discard
