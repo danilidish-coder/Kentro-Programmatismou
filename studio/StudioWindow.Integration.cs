@@ -73,7 +73,17 @@ internal sealed partial class StudioWindow
             lines.Add("DEBUG: report payload=" + report.GetRawText());
             lines.Add("DEBUG: resolved path=" + reportPath);
             lines.Add("DEBUG: report-path length=" + reportPath.Length);
-            lines.Add("DEBUG: parent-exists=" + Directory.Exists(Path.GetDirectoryName(reportPath) ?? ""));
+            var reportDirectory = Path.GetDirectoryName(reportPath) ?? "";
+            lines.Add("DEBUG: parent-exists=" + Directory.Exists(reportDirectory));
+            lines.Add("DEBUG: expected-filename-utf8=" + Convert.ToHexString(System.Text.Encoding.UTF8.GetBytes(Path.GetFileName(reportPath))));
+            if (Directory.Exists(reportDirectory))
+            {
+                foreach (var actualFile in Directory.EnumerateFiles(reportDirectory))
+                {
+                    lines.Add("DEBUG: disk-filename=" + Path.GetFileName(actualFile));
+                    lines.Add("DEBUG: disk-filename-utf8=" + Convert.ToHexString(System.Text.Encoding.UTF8.GetBytes(Path.GetFileName(actualFile))));
+                }
+            }
             lines.Add("DEBUG: localappdata=" + Environment.GetEnvironmentVariable("LOCALAPPDATA"));
             Require(File.Exists(reportPath), "Exported report must exist: " + reportPath);
             var backup = await EngineBridge.RunAsync("backup", id);
