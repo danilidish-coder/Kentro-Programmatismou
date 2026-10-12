@@ -41,14 +41,23 @@ jobs:
       - name: GUI smoke - ZIP button crash regression
         shell: powershell
         run: .\ci\windows-smoke.ps1
-      - name: Upload windows executables and proof
+      - name: Preserve test reports even after failure
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: kentro-windows-beta2-and-test-logs
+          name: kentro-test-reports
+          path: |
+            build/windows-unit.log
+            build/windows-ui-smoke.log
+          if-no-files-found: warn
+      - name: Publish Windows EXE and Setup only after ALL checks pass
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kentro-verified-windows-exe-setup
           path: |
             build/Kentro_Programmatismou.exe
             build/Kentro_Programmatismou_Setup.exe
             build/windows-unit.log
             build/windows-ui-smoke.log
-          if-no-files-found: warn
+          if-no-files-found: error
