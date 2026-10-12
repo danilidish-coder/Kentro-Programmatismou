@@ -54,6 +54,9 @@ jobs:
       - name: Launch modern UI on a real Windows runner
         run: |
           ./ci/studio-smoke.ps1
+      - name: Exercise native GUI actions and Go modules as one complete application
+        run: |
+          ./ci/studio-ui-integration.ps1
       - name: Package complete WinUI app + Go engine inside ONE Windows EXE
         run: |
           New-Item -ItemType Directory -Force source/cmd/onefile,single | Out-Null
@@ -84,6 +87,7 @@ jobs:
             studio-onefile-build.log
             studio-onefile-smoke.log
             studio-modules.log
+            studio-ui-integration.log
           if-no-files-found: warn
       - name: Publish single verified Windows EXE
         if: success()
