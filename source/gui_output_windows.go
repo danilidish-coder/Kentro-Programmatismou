@@ -57,18 +57,33 @@ func refreshList() {
 		appendOutput("Σφάλμα λίστας: " + e.Error())
 		return
 	}
-	sort.Slice(ps, func(i, j int) bool { return ps[i].ImportedAt.After(ps[j].ImportedAt) })
-	ui.ids = nil
+    sort.Slice(ps, func(i, j int) bool { return ps[i].ImportedAt.After(ps[j].ImportedAt) })
+    // Preserve the active project when refreshing after tests or import.
+    selectedID:=""
+    index:=invoke(sendMessage,ui.list,lbGetCurSel,0,0)
+    if index!=^uintptr(0) && int(index)<len(ui.ids) { selectedID=ui.ids[int(index)] }
+    ui.ids = nil
 	invoke(sendMessage, ui.list, lbResetContent, 0, 0)
 	for _, p := range ps {
 		ui.ids = append(ui.ids, p.ID)
 		txt := fmt.Sprintf("%s  |  %s  |  %s", p.Name, p.Version, p.Language)
 		invoke(sendMessage, ui.list, lbAddString, 0, uintptr(unsafe.Pointer(u16(txt))))
 	}
-	if len(ui.ids) > 0 {
-		invoke(sendMessage, ui.list, lbSetCurSel, 0, 0)
-	}
-	updateProjectStage()
+    if ui.projectTitle!=0 {
+        countLabel:=fmt.Sprintf("ΤΑ ΕΡΓΑ ΜΟΥ  ·  %d",len(ui.ids))
+        invoke(sendMessage,ui.projectTitle,wmSetText,0,uintptr(unsafe.Pointer(u16(countLabel))))
+    }
+    if len(ui.ids)>0 {
+        next:=0
+        for i,id:=range ui.ids {if id==selectedID {next=i;break}}
+        invoke(sendMessage,ui.list,lbSetCurSel,uintptr(next),0)
+    }
+    if ui.emptyHint!=0 {
+        show:=uintptr(0)
+        if len(ui.ids)==0 {show=5}
+        invoke(showWindow,ui.emptyHint,show)
+    }
+    updateProjectStage()
 }
 func selected() string {
 	n := invoke(sendMessage, ui.list, lbGetCurSel, 0, 0)
@@ -85,7 +100,10 @@ func showStage(value string) {
     }
 }
 func updateProjectStage() {
-    if ui.list==0 || ui.store==nil {return}
+    if ui.list==0 || ui.store==nil || ui.busy {return}
+    // Keep later-stage actions locked until their actual prerequisite is met.
+    if btn:=ui.buttons[115];btn!=0 {invoke(enableWindow,btn,0)}
+    if btn:=ui.buttons[116];btn!=0 {invoke(enableWindow,btn,0)}
     index:=invoke(sendMessage,ui.list,lbGetCurSel,0,0)
     if index==^uintptr(0)||int(index)>=len(ui.ids) {
         showStage("1/4 · Εισάγετε ή επιλέξτε έργο")
@@ -96,7 +114,11 @@ func updateProjectStage() {
     if err!=nil {showStage("2/4 · Αναμονή λειτουργικών ελέγχων και stress tests");return}
     if engine.IsChecksBlocked(run) {showStage("2/4 · Εντοπίστηκαν προβλήματα — EXE αποκλεισμένο");return}
     if err:=ui.store.ReadyForBuild(id);err!=nil {showStage("2/4 · Διαβάστε την αναφορά — "+err.Error());return}
-    if err:=ui.store.ReadyForSetup(id);err==nil {showStage("4/4 · Το EXE πέρασε — προαιρετικό Setup διαθέσιμο");return}
+    if btn:=ui.buttons[115];btn!=0 {invoke(enableWindow,btn,1)}
+    if err:=ui.store.ReadyForSetup(id);err==nil {
+        if btn:=ui.buttons[116];btn!=0 {invoke(enableWindow,btn,1)}
+        showStage("4/4 · Το EXE πέρασε — προαιρετικό Setup διαθέσιμο");return
+    }
     latest,err:=ui.store.LatestRun(id)
     if err==nil && latest.Stage==engine.StageBuild && !latest.Blocked {
         showStage("3/4 · Το EXE ολοκληρώθηκε — Setup μόνο με διαθέσιμη συνταγή")

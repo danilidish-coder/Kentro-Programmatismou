@@ -114,7 +114,7 @@ type event struct {
 }
 
 var ui struct {
-	main, list, output, header, brand, subhead, projectTitle, actionTitle, resultsTitle, footer, stageStatus uintptr
+	main, list, output, emptyHint, header, brand, subhead, projectTitle, actionTitle, resultsTitle, footer, stageStatus uintptr
 	buttons                                                                                     map[int]uintptr
 	fonts                                                                                       []uintptr
 	store                                                                                       *engine.Store
@@ -193,13 +193,21 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		ui.header = control("STATIC", "Κέντρο Προγραμματισμού", wsChildVisible, 0, 84, 20, 850, 42)
 		invoke(sendMessage, ui.header, wmSetFont, fontTitle, 1)
 		invoke(sendMessage, ui.brand, wmSetFont, fontHeading, 1)
-		ui.subhead = control("STATIC", "ΜΟΝΟ ΣΤΟΝ ΥΠΟΛΟΓΙΣΤΗ ΣΟΥ  •  ΕΚΔΟΣΗ "+engine.ProductVersion, wsChildVisible, 0, 86, 61, 800, 24)
+		ui.subhead = control("STATIC", "ΤΟΠΙΚΟ ΕΡΓΑΣΤΗΡΙΟ ΕΦΑΡΜΟΓΩΝ  ·  ΕΚΔΟΣΗ "+engine.ProductVersion, wsChildVisible, 0, 86, 61, 800, 24)
 		ui.projectTitle = control("STATIC", "ΤΑ ΕΡΓΑ ΜΟΥ", wsChildVisible, 0, 28, 105, 250, 28)
-		ui.actionTitle = control("STATIC", "ΣΤΑΔΙΑ ΕΡΓΑΣΙΑΣ", wsChildVisible, 0, 345, 105, 660, 28)
+		ui.actionTitle = control("STATIC", "ΡΟΗ ΕΡΓΑΣΙΑΣ", wsChildVisible, 0, 345, 105, 660, 28)
 		ui.stageStatus = control("STATIC", "1. Εισαγωγή → 2. Έλεγχοι → 3. EXE → 4. Setup (προαιρετικό)", wsChildVisible, 0, 345, 144, 650, 23)
-		ui.resultsTitle = control("STATIC", "ΠΡΟΟΔΟΣ ΚΑΙ ΑΠΟΤΕΛΕΣΜΑΤΑ", wsChildVisible, 0, 345, 430, 660, 27)
+		ui.resultsTitle = control("STATIC", "ΑΝΑΦΟΡΑ ΚΑΙ ΠΡΟΟΔΟΣ", wsChildVisible, 0, 345, 430, 660, 27)
 		ui.footer = control("STATIC", "Τοπική λειτουργία • Τα έργα παραμένουν στον υπολογιστή", wsChildVisible, 0, 28, 690, 860, 28)
+		for _,section:=range []uintptr{ui.projectTitle,ui.actionTitle,ui.resultsTitle} {
+            invoke(sendMessage,section,wmSetFont,fontSmall,1)
+        }
+        invoke(sendMessage,ui.stageStatus,wmSetFont,fontBody,1)
+        invoke(sendMessage,ui.subhead,wmSetFont,fontSmall,1)
+        invoke(sendMessage,ui.footer,wmSetFont,fontSmall,1)
 		ui.list = control("LISTBOX", "", wsChildVisible|wsTabStop|wsVscroll|0x0001|0x0040, 90, 28, 200, 275, 450)
+        ui.emptyHint = control("STATIC", "Δεν υπάρχουν έργα ακόμη.\n\nΞεκινήστε με εισαγωγή ZIP.", wsChildVisible, 92, 38, 270, 245, 80)
+        invoke(sendMessage, ui.emptyHint, wmSetFont, fontBody, 1)
 		// Only the actions requested by a non-programmer are on the home screen.
 		// Backup/version management still happens inside the local engine.
 		btns := []struct {
@@ -326,6 +334,7 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 					invoke(enableWindow, btn, 0)
 				}
 			}
+			updateProjectStage()
 		}
 		return 0
 	case wmDestroy:
@@ -364,6 +373,7 @@ func layout(hwnd uintptr) {
         listHeight:=h-340
         if listHeight<175{listHeight=175}
         invoke(moveWindow,ui.list,22,194,uintptr(mainX-34),uintptr(listHeight),1)
+        invoke(moveWindow,ui.emptyHint,39,uintptr(258),uintptr(mainX-70),105,1)
         invoke(moveWindow,ui.buttons[113],22,uintptr(h-126),uintptr(mainX-34),42,1)
         invoke(moveWindow,ui.buttons[114],22,uintptr(h-78),uintptr(mainX-34),36,1)
         invoke(moveWindow,ui.buttons[103],uintptr(mainX),153,uintptr(contentW),49,1)
@@ -380,6 +390,7 @@ func layout(hwnd uintptr) {
         invoke(moveWindow,ui.stageStatus,uintptr(mainX),145,uintptr(contentW),22,1)
         invoke(moveWindow,ui.buttons[101],24,154,uintptr(mainX-30),58,1)
         invoke(moveWindow,ui.list,24,226,uintptr(mainX-30),uintptr(h-425),1)
+        invoke(moveWindow,ui.emptyHint,43,290,uintptr(mainX-76),108,1)
         invoke(moveWindow,ui.buttons[113],24,uintptr(h-177),uintptr(mainX-30),47,1)
         invoke(moveWindow,ui.buttons[114],24,uintptr(h-121),uintptr(mainX-30),40,1)
         invoke(moveWindow,ui.buttons[103],uintptr(mainX),175,uintptr(contentW),66,1)

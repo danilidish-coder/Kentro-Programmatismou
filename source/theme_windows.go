@@ -15,17 +15,21 @@ import (
 // A cohesive native, dark interface: no embedded browser or GitHub integration.
 func rgb(r, g, b uintptr) uintptr { return r | (g << 8) | (b << 16) }
 
+// A calm, high-contrast native Windows studio palette (not a browser).
 var (
-	bgColor                                              = rgb(12, 21, 35)
-	panelColor                                           = rgb(21, 35, 54)
-	sideColor                                            = rgb(17, 30, 47)
-	fieldColor                                           = rgb(26, 44, 66)
-	topColor                                             = rgb(14, 25, 42)
-	accentColor                                          = rgb(45, 124, 232)
-	textColor                                            = rgb(235, 243, 254)
-	dimColor                                             = rgb(139, 165, 197)
-	fontTitle, fontHeading, fontBody, fontMono           uintptr
-	brushBG, brushPanel, brushSide, brushField, brushTop uintptr
+    bgColor = rgb(242, 246, 252)
+    panelColor = rgb(255, 255, 255)
+    sideColor = rgb(255, 255, 255)
+    fieldColor = rgb(247, 249, 253)
+    topColor = rgb(255, 255, 255)
+    accentColor = rgb(42, 104, 221)
+    accentSoft = rgb(231, 240, 255)
+    textColor = rgb(28, 43, 66)
+    dimColor = rgb(100, 119, 146)
+    lineColor = rgb(221, 229, 239)
+    successColor = rgb(18, 132, 106)
+    fontTitle, fontHeading, fontBody, fontMono, fontButton, fontSmall uintptr
+    brushBG, brushPanel, brushSide, brushField, brushTop, brushBrand uintptr
 )
 var (
 	beginPaint      = user32.NewProc("BeginPaint")
@@ -42,6 +46,7 @@ var (
 	deleteObject    = gdi32.NewProc("DeleteObject")
 	createFont      = gdi32.NewProc("CreateFontW")
 	roundRect       = gdi32.NewProc("RoundRect")
+	ellipse         = gdi32.NewProc("Ellipse")
 )
 
 type minMaxInfo struct {
@@ -67,84 +72,89 @@ func makeFont(height, weight int, face string) uintptr {
 	return invoke(createFont, uintptr(int32(-height)), 0, 0, 0, uintptr(weight), 0, 0, 0, 1, 0, 0, 5, 0, uintptr(unsafe.Pointer(u16(face))))
 }
 func initThemeFonts() {
-	if fontBody != 0 {
-		return
-	}
-	fontTitle = makeFont(30, 700, "Segoe UI")
-	fontHeading = makeFont(23, 700, "Segoe UI")
-	fontBody = makeFont(19, 500, "Segoe UI")
-	fontMono = makeFont(17, 400, "Consolas")
-	brushBG = makeBrush(bgColor)
-	brushPanel = makeBrush(panelColor)
-	brushSide = makeBrush(sideColor)
-	brushField = makeBrush(fieldColor)
-	brushTop = makeBrush(topColor)
+    if fontBody != 0 { return }
+    fontTitle = makeFont(31, 700, "Segoe UI")
+    fontHeading = makeFont(19, 650, "Segoe UI")
+    fontBody = makeFont(17, 450, "Segoe UI")
+    fontButton = makeFont(18, 650, "Segoe UI")
+    fontSmall = makeFont(14, 450, "Segoe UI")
+    fontMono = makeFont(15, 450, "Consolas")
+    brushBG = makeBrush(bgColor)
+    brushPanel = makeBrush(panelColor)
+    brushSide = makeBrush(sideColor)
+    brushField = makeBrush(fieldColor)
+    brushTop = makeBrush(topColor)
+    brushBrand = makeBrush(accentSoft)
 }
 func releaseTheme() {
-	for _, h := range []uintptr{fontTitle, fontHeading, fontBody, fontMono, brushBG, brushPanel, brushSide, brushField, brushTop} {
-		if h != 0 {
-			invoke(deleteObject, h)
-		}
-	}
+    for _,h:=range []uintptr{fontTitle,fontHeading,fontBody,fontButton,fontSmall,fontMono,
+        brushBG,brushPanel,brushSide,brushField,brushTop,brushBrand} {
+        if h!=0 {invoke(deleteObject,h)}
+    }
 }
 func paintFill(dc uintptr, r rect, brush uintptr) {
 	invoke(fillRect, dc, uintptr(unsafe.Pointer(&r)), brush)
 }
+func roundedArea(dc uintptr,r rect,fill,border uintptr,radius int) {
+    brush:=makeBrush(fill)
+    pen:=invoke(createPen,0,1,border)
+    oldBrush:=invoke(selectObject,dc,brush)
+    oldPen:=invoke(selectObject,dc,pen)
+    invoke(roundRect,dc,uintptr(r.L),uintptr(r.T),uintptr(r.R),uintptr(r.B),uintptr(radius),uintptr(radius))
+    invoke(selectObject,dc,oldBrush)
+    invoke(selectObject,dc,oldPen)
+    invoke(deleteObject,pen)
+    invoke(deleteObject,brush)
+}
 func paintBackground(hwnd uintptr) {
-	var ps paintStruct
-	dc := invoke(beginPaint, hwnd, uintptr(unsafe.Pointer(&ps)))
-	if dc == 0 {
-		return
-	}
-	defer invoke(endPaint, hwnd, uintptr(unsafe.Pointer(&ps)))
-	var r rect
-	invoke(getClientRect, hwnd, uintptr(unsafe.Pointer(&r)))
-	w, h := r.R, r.B
-	if brushBG == 0 {
-		initThemeFonts()
-	}
-	paintFill(dc, rect{0, 0, w, h}, brushBG)
-	paintFill(dc, rect{0, 0, w, 101}, brushTop)
-	if w > 20 && h > 120 {
-		paintFill(dc, rect{13, 109, 316, h - 53}, brushSide)
-		paintFill(dc, rect{322, 109, w - 15, h - 53}, brushPanel)
-		paintFill(dc, rect{339, 459, w - 28, h - 66}, brushField)
-	}
+    var ps paintStruct
+    dc:=invoke(beginPaint,hwnd,uintptr(unsafe.Pointer(&ps)))
+    if dc==0{return}
+    defer invoke(endPaint,hwnd,uintptr(unsafe.Pointer(&ps)))
+    var client rect
+    invoke(getClientRect,hwnd,uintptr(unsafe.Pointer(&client)))
+    w,h:=client.R,client.B
+    if brushBG==0{initThemeFonts()}
+    paintFill(dc,rect{0,0,w,h},brushBG)
+    paintFill(dc,rect{0,0,w,98},brushTop)
+    // A thin brand stroke establishes hierarchy without filling the dashboard.
+    paintFill(dc,rect{0,96,w,98},brushBrand)
+    mainX:=int32(332)
+    if w<950{mainX=309}
+    // Solid white cards with subtle border, generous whitespace.
+    roundedArea(dc,rect{15,110,mainX-12,h-50},panelColor,lineColor,18)
+    roundedArea(dc,rect{mainX-9,110,w-15,h-50},panelColor,lineColor,18)
+    // Brand monogram.
+    roundedArea(dc,rect{25,19,73,69},accentSoft,accentSoft,15)
+    // Progress rail: a quiet four-step cue. The active stage is in the live label.
+    paintFill(dc,rect{mainX+16,148,w-33,150},brushBrand)
 }
 func colorStatic(dc, hwnd uintptr) uintptr {
-	invoke(setBkMode, dc, 1)
-	clr := textColor
-	brush := brushPanel
-	switch hwnd {
-	case ui.brand:
-		clr = accentColor
-		brush = brushTop
-	case ui.header:
-		brush = brushTop
-	case ui.subhead:
-		clr = dimColor
-		brush = brushTop
-	case ui.projectTitle:
-		clr = dimColor
-		brush = brushSide
-	case ui.actionTitle, ui.resultsTitle:
-		clr = dimColor
-		brush = brushPanel
-	case ui.stageStatus:
-		clr = rgb(160, 208, 255)
-		brush = brushPanel
-	case ui.footer:
-		clr = dimColor
-		brush = brushBG
-	case ui.output:
-		// Read-only EDIT sends WM_CTLCOLORSTATIC. Transparent background
-		// over old glyphs caused the illegible overlapping text.
-		invoke(setBkMode, dc, 2)
-		invoke(setBkColor, dc, fieldColor)
-		brush = brushField
-	}
-	invoke(setTextColor, dc, clr)
-	return brush
+    invoke(setBkMode,dc,2)
+    clr:=textColor
+    brush:=brushPanel
+    bg:=panelColor
+    switch hwnd {
+    case ui.brand:
+        clr=accentColor;brush=brushBrand;bg=accentSoft
+    case ui.header:
+        brush=brushTop;bg=topColor
+    case ui.subhead:
+        clr=dimColor;brush=brushTop;bg=topColor
+    case ui.projectTitle,ui.actionTitle,ui.resultsTitle:
+        clr=dimColor
+    case ui.stageStatus:
+        clr=accentColor
+    case ui.footer:
+        clr=dimColor;brush=brushBG;bg=bgColor
+    case ui.emptyHint:
+        clr=dimColor;brush=brushField;bg=fieldColor
+    case ui.output,ui.list:
+        brush=brushField;bg=fieldColor
+    }
+    invoke(setTextColor,dc,clr)
+    invoke(setBkColor,dc,bg)
+    return brush
 }
 func colorField(dc uintptr) uintptr {
 	invoke(setBkMode, dc, 2)
@@ -153,83 +163,85 @@ func colorField(dc uintptr) uintptr {
 	return brushField
 }
 func drawButton(d *drawItemStruct) {
-	if d == nil || d.Hdc == 0 {
-		return
-	}
-	id := int(d.ControlID)
-	enabled := invoke(isWindowEnabled, d.Hwnd) != 0
-	fill := rgb(35, 55, 78)
-	border := rgb(58, 82, 110)
-	if id == 103 {
-        fill = accentColor
-        border = rgb(83, 163, 255)
-    } else if id == 115 {
-        fill = rgb(32, 111, 100)
-        border = rgb(68, 175, 150)
-    } else if id == 116 {
-        fill = rgb(52, 65, 90)
-        border = rgb(105, 129, 171)
-    } else if id == 101 {
-        fill = rgb(35, 69, 112)
-        border = rgb(78, 120, 181)
-    } else if id == 104 || id == 105 {
-        fill = rgb(31, 52, 75)
-        border = rgb(60, 87, 124)
+    if d==nil || d.Hdc==0{return}
+    id:=int(d.ControlID)
+    enabled:=invoke(isWindowEnabled,d.Hwnd)!=0
+    pressed:=d.ItemState&0x0001!=0
+    focused:=d.ItemState&0x0010!=0
+    primary:=id==103||id==115
+    step:=id==101||id==103||id==115||id==116
+    bg,border,fg:=panelColor,lineColor,textColor
+    if primary {bg,border,fg=accentColor,accentColor,rgb(255,255,255)}
+    if id==116{bg,border,fg=accentSoft,accentSoft,accentColor}
+    if id==111{bg,border,fg=rgb(253,239,241),rgb(253,239,241),rgb(161,65,76)}
+    if pressed&&enabled{bg=rgb(26,80,181);if !primary{bg=rgb(231,237,245)}}
+    if !enabled{bg,border,fg=rgb(244,246,250),rgb(233,238,246),rgb(155,167,183)}
+    rc:=d.ItemRect
+    if rc.R-rc.L<35||rc.B-rc.T<22{return}
+    roundedArea(d.Hdc,rc,bg,border,16)
+    if focused && enabled {
+        // Minimal keyboard focus indicator inside the button.
+        inset:=rect{rc.L+3,rc.T+3,rc.R-3,rc.B-3}
+        focusPen:=invoke(createPen,0,1,accentColor)
+        oldPen:=invoke(selectObject,d.Hdc,focusPen)
+        oldBrush:=invoke(selectObject,d.Hdc,invoke(getStockObject,5)) // NULL_BRUSH
+        invoke(roundRect,d.Hdc,uintptr(inset.L),uintptr(inset.T),uintptr(inset.R),uintptr(inset.B),12,12)
+        invoke(selectObject,d.Hdc,oldBrush)
+        invoke(selectObject,d.Hdc,oldPen)
+        invoke(deleteObject,focusPen)
     }
-	if id == 108 {
-		fill = rgb(28, 111, 112)
-		border = rgb(59, 164, 159)
-	}
-	if id == 111 {
-		fill = rgb(95, 47, 57)
-		border = rgb(160, 75, 87)
-	}
-	if !enabled {
-        fill = rgb(35,45,58)
-        border = rgb(44,56,72)
-    }
-	brush := makeBrush(fill)
-	pen := invoke(createPen, 0, 1, border)
-	oldBrush := invoke(selectObject, d.Hdc, brush)
-	oldPen := invoke(selectObject, d.Hdc, pen)
-	rc := d.ItemRect
-	invoke(roundRect, d.Hdc, uintptr(rc.L), uintptr(rc.T), uintptr(rc.R), uintptr(rc.B), 14, 14)
-	invoke(selectObject, d.Hdc, oldBrush)
-	invoke(selectObject, d.Hdc, oldPen)
-	invoke(deleteObject, pen)
-	invoke(deleteObject, brush)
-	invoke(setBkMode, d.Hdc, 1)
-	if enabled {
-		invoke(setTextColor, d.Hdc, textColor)
-	} else {
-		invoke(setTextColor, d.Hdc, dimColor)
-	}
-	// Button IDs are looked up from a static literal table, not parsed from window text.
-	caption := buttonCaption(id)
-	invoke(drawText, d.Hdc, uintptr(unsafe.Pointer(u16(caption))), uintptr(^uint32(0)), uintptr(unsafe.Pointer(&rc)), 0x25)
+    caption:=buttonCaption(id)
+    if caption==""{return}
+    invoke(setBkMode,d.Hdc,1)
+    invoke(setTextColor,d.Hdc,fg)
+    font:=fontButton
+    if !step{font=fontBody}
+    oldFont:=invoke(selectObject,d.Hdc,font)
+    textRect:=rc
+    if step {
+        // A separate numeric marker makes the workflow readable at a glance.
+        number:="01"
+        switch id {case 103:number="02";case 115:number="03";case 116:number="04"}
+        size:=int32(32)
+        if rc.R-rc.L<230{size=26}
+        cx:=rc.L+13
+        cy:=rc.T+(rc.B-rc.T-size)/2
+        markerBg:=accentSoft
+        markerFg:=accentColor
+        if primary{markerBg=rgb(75,137,232);markerFg=rgb(255,255,255)}
+        if !enabled{markerBg=rgb(231,236,244);markerFg=dimColor}
+        marker:=rect{cx,cy,cx+size,cy+size}
+        brush:=makeBrush(markerBg)
+        oldBrush:=invoke(selectObject,d.Hdc,brush)
+        pen:=invoke(createPen,0,1,markerBg)
+        oldPen:=invoke(selectObject,d.Hdc,pen)
+        invoke(ellipse,d.Hdc,uintptr(marker.L),uintptr(marker.T),uintptr(marker.R),uintptr(marker.B))
+        invoke(selectObject,d.Hdc,oldBrush);invoke(selectObject,d.Hdc,oldPen)
+        invoke(deleteObject,brush);invoke(deleteObject,pen)
+        invoke(setTextColor,d.Hdc,markerFg)
+        markText:=marker
+        invoke(drawText,d.Hdc,uintptr(unsafe.Pointer(u16(number))),uintptr(^uint32(0)),uintptr(unsafe.Pointer(&markText)),0x25)
+        invoke(setTextColor,d.Hdc,fg)
+        textRect.L=cx+size+9
+        textRect.R-=9
+    } else {textRect.L+=12;textRect.R-=12}
+    // DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS
+    invoke(drawText,d.Hdc,uintptr(unsafe.Pointer(u16(caption))),uintptr(^uint32(0)),uintptr(unsafe.Pointer(&textRect)),0x0020|0x0004|0x00008000)
+    invoke(selectObject,d.Hdc,oldFont)
 }
 func buttonCaption(id int) string {
-	switch id {
-	case 101:
-		return "01   Εισαγωγή ZIP"
-	case 103:
-        return "02   ΕΛΕΓΧΟΙ ΚΑΙ STRESS TESTS"
-    case 115:
-        return "03   ΔΗΜΙΟΥΡΓΙΑ EXE"
-    case 116:
-        return "04   SETUP (ΠΡΟΑΙΡΕΤΙΚΟ)"
-    case 104:
-        return "Αναφορά ελέγχων"
-	case 105:
-		return "Αναφορά για ChatGPT"
-	case 111:
-		return "Ακύρωση εργασίας"
-	case 113:
-		return "Αφαίρεση επιλεγμένου έργου"
-	case 114:
-		return "Επαναφορά αφαιρεμένου"
-	}
-	return ""
+    switch id {
+    case 101:return "Εισαγωγή έργου ZIP"
+    case 103:return "Έλεγχοι και stress tests"
+    case 115:return "Δημιουργία EXE"
+    case 116:return "Προαιρετικό Setup"
+    case 104:return "Αποτελέσματα"
+    case 105:return "Εξαγωγή αναφοράς"
+    case 111:return "Ακύρωση εργασίας"
+    case 113:return "Αφαίρεση έργου"
+    case 114:return "Επαναφορά έργου"
+    }
+    return ""
 }
 
 // Panic reporting is essential for a windowsgui executable (no visible console).

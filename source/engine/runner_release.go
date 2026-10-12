@@ -169,7 +169,7 @@ func (s *Store) RestoreNewest(id string) (Project, error) {
 	return result, nil
 }
 func (s *Store) ExportLatest(id string) (string, error) {
-	_, _, e := s.Get(id)
+    project, _, e := s.Get(id)
 	if e != nil {
 		return "", e
 	}
@@ -178,7 +178,25 @@ func (s *Store) ExportLatest(id string) (string, error) {
 		return "", e
 	}
 	dir := filepath.Join(s.Root, "projects", id, "runs", r.ID)
-	out := filepath.Join(s.Root, "reports", id+"-"+r.ID+"-RESULTS.zip")
+	// Human-readable filename: stage, local date and project name, never a
+    // second indistinguishable opaque Results archive.
+    stageName:="ΠΑΛΑΙΑ_ΑΝΑΦΟΡΑ"
+    switch r.Stage {
+    case StageChecks: stageName="ΕΛΕΓΧΟΙ_STRESS"
+    case StageBuild: stageName="EXE"
+    case StageSetup: stageName="SETUP"
+    }
+    var clean strings.Builder
+    for _,ch:=range project.Name {
+        if clean.Len()>72 {break}
+        if (ch>='a'&&ch<='z')||(ch>='A'&&ch<='Z')||(ch>='0'&&ch<='9')||(ch>='Α'&&ch<='Ω')||(ch>='α'&&ch<='ω')||ch=='_'||ch=='-' {
+            clean.WriteRune(ch)
+        } else if ch==' '||ch=='.' {clean.WriteByte('_')}
+    }
+    name:=strings.Trim(clean.String(),"_")
+    if name==""{name="ΕΡΓΟ"}
+    stamp:=r.Started.Local().Format("20060102_150405")
+    out := filepath.Join(s.Root, "reports", "ΑΝΑΦΟΡΑ_"+stageName+"_"+name+"_"+stamp+"_"+r.ID[:8]+".zip")
 	entries := map[string][]byte{}
 	for _, name := range []string{"SUMMARY_GR.txt", "results.json"} {
 		b, e := os.ReadFile(filepath.Join(dir, name))

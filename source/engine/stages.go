@@ -89,7 +89,9 @@ func (s *Store) RunChecks(ctx context.Context,id string,progress func(string)) (
     if len(m.Stress)==0 {add(Result{Name:"Δεν υπάρχουν stress tests",Phase:"STRESS",Status:"NOT RUN",Required:true,Reason:"Απαιτούνται τεστ πίεσης"})}
     for i,step:=range m.Stress {
         if ctx.Err()!=nil {add(Result{Name:step.Name,Phase:"STRESS",Status:"CANCELLED",Required:step.Mandatory(),Reason:"Ακυρώθηκε"});continue}
-        add(runStress(ctx,execWork,logs,i,step))
+        deep:=DeepStressPlan(step)
+        if progress!=nil {progress("ΠΛΑΝΟ ΠΙΕΣΗΣ: "+StressPlanDescription(deep))}
+        add(runStress(ctx,execWork,logs,i,deep))
     }
     current,e:=HashTree(filepath.Join(base,"source"))
     if e!=nil{return r,e}
