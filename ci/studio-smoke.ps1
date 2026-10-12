@@ -1,4 +1,6 @@
 $ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
 $exe = Join-Path $PSScriptRoot '..\publish\Kentro_Programmatismou.exe'
 $log = Join-Path $PSScriptRoot '..\studio-smoke.log'
 "Opening native WinUI 3 desktop application..." | Set-Content $log
@@ -15,7 +17,6 @@ try {
   "PASS: WinUI 3 window hwnd=$handle" | Tee-Object -FilePath $log -Append
   Start-Sleep -Seconds 2
   if ($p.HasExited) { throw "FAIL: UI crashed after startup" }
-  Add-Type -AssemblyName System.Drawing
   Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
