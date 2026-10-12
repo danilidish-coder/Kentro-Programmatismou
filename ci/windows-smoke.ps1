@@ -14,6 +14,7 @@ public static class UIMessage {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
   [DllImport("user32.dll")] public static extern int GetDlgCtrlID(IntPtr hwnd);
   [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr parent, int id);
+  [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr hwnd);
   [DllImport("user32.dll")] public static extern int GetSystemMetrics(int id);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr hwnd, uint message, IntPtr wp, System.Text.StringBuilder lp);
   [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hwnd, uint message, IntPtr wp, IntPtr lp);
@@ -80,6 +81,12 @@ try {
         if($handle -eq [IntPtr]::Zero){throw "FAIL: GetDlgItem cannot find button $id"}
         return $handle
     }
+    # Build/installer steps remain locked until a real CHECKS and BUILD report exists.
+    foreach($id in @(115,116)){
+        $handle=Get-ById $id
+        if([UIMessage]::IsWindowEnabled($handle)){throw "FAIL: workflow step $id unlocked before successful prerequisite"}
+    }
+    Trace 'PASS: guarded build and Setup controls start locked'
     $ordered=@(103,115,116)
     $controlRects=@{}
     foreach($id in $ordered){
