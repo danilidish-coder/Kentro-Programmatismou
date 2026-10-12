@@ -20,13 +20,13 @@ var (
     bgColor = rgb(242, 246, 252)
     panelColor = rgb(255, 255, 255)
     sideColor = rgb(255, 255, 255)
-    fieldColor = rgb(247, 249, 253)
+    fieldColor = rgb(241, 246, 252)
     topColor = rgb(255, 255, 255)
     accentColor = rgb(42, 104, 221)
     accentSoft = rgb(231, 240, 255)
     textColor = rgb(28, 43, 66)
     dimColor = rgb(100, 119, 146)
-    lineColor = rgb(221, 229, 239)
+    lineColor = rgb(166, 183, 207)
     successColor = rgb(18, 132, 106)
     fontTitle, fontHeading, fontBody, fontMono, fontButton, fontSmall uintptr
     brushBG, brushPanel, brushSide, brushField, brushTop, brushBrand uintptr
@@ -122,7 +122,10 @@ func paintBackground(hwnd uintptr) {
     mainX:=int32(332)
     if w<950{mainX=309}
     // Solid white cards with subtle border, generous whitespace.
-    roundedArea(dc,rect{15,110,mainX-12,h-50},panelColor,lineColor,18)
+    // Two raised working surfaces with visible outlines and drop shadows.
+    roundedArea(dc,rect{18,115,mainX-11,h-45},rgb(205,215,229),rgb(205,215,229),18)
+    roundedArea(dc,rect{15,110,mainX-14,h-50},panelColor,lineColor,18)
+    roundedArea(dc,rect{mainX-5,115,w-11,h-45},rgb(205,215,229),rgb(205,215,229),18)
     roundedArea(dc,rect{mainX-9,110,w-15,h-50},panelColor,lineColor,18)
     // Brand monogram.
     roundedArea(dc,rect{25,19,73,69},accentSoft,accentSoft,15)
@@ -147,6 +150,8 @@ func colorStatic(dc, hwnd uintptr) uintptr {
         clr=accentColor
     case ui.footer:
         clr=dimColor;brush=brushBG;bg=bgColor
+    case ui.projectDetail:
+        clr=accentColor
     case ui.emptyHint:
         clr=dimColor;brush=brushField;bg=fieldColor
     case ui.output,ui.list:
@@ -168,65 +173,95 @@ func drawButton(d *drawItemStruct) {
     enabled:=invoke(isWindowEnabled,d.Hwnd)!=0
     pressed:=d.ItemState&0x0001!=0
     focused:=d.ItemState&0x0010!=0
-    primary:=id==103||id==115
+    hovered:=enabled && ui.hoverButton==id
     step:=id==101||id==103||id==115||id==116
-    bg,border,fg:=panelColor,lineColor,textColor
-    if primary {bg,border,fg=accentColor,accentColor,rgb(255,255,255)}
-    if id==116{bg,border,fg=accentSoft,accentSoft,accentColor}
-    if id==111{bg,border,fg=rgb(253,239,241),rgb(253,239,241),rgb(161,65,76)}
-    if pressed&&enabled{bg=rgb(26,80,181);if !primary{bg=rgb(231,237,245)}}
-    if !enabled{bg,border,fg=rgb(244,246,250),rgb(233,238,246),rgb(155,167,183)}
+    primary:=id==103||id==115
     rc:=d.ItemRect
     if rc.R-rc.L<35||rc.B-rc.T<22{return}
-    roundedArea(d.Hdc,rc,bg,border,16)
-    if focused && enabled {
-        // Minimal keyboard focus indicator inside the button.
-        inset:=rect{rc.L+3,rc.T+3,rc.R-3,rc.B-3}
-        focusPen:=invoke(createPen,0,1,accentColor)
-        oldPen:=invoke(selectObject,d.Hdc,focusPen)
-        oldBrush:=invoke(selectObject,d.Hdc,invoke(getStockObject,5)) // NULL_BRUSH
-        invoke(roundRect,d.Hdc,uintptr(inset.L),uintptr(inset.T),uintptr(inset.R),uintptr(inset.B),12,12)
+
+    // Physical button layers: back shadow, elevation, strong visible bezel,
+    // upper highlight, and pressed state with reduced offset.
+    base,border,foreground:=rgb(248,250,254),rgb(133,155,183),textColor
+    topGlow:=rgb(255,255,255)
+    shadow:=rgb(181,197,219)
+    if primary{
+        base,border,foreground=rgb(40,108,223),rgb(16,68,152),rgb(255,255,255)
+        topGlow=rgb(82,149,245)
+        shadow=rgb(130,155,193)
+    } else if id==116 {
+        base,border,foreground=rgb(232,243,255),rgb(78,133,196),rgb(26,82,158)
+        topGlow=rgb(255,255,255)
+    } else if id==111 {
+        base,border,foreground=rgb(254,242,242),rgb(197,121,132),rgb(145,56,70)
+    }
+    if hovered {
+        if primary {
+            base=rgb(29,90,195);border=rgb(10,52,126);topGlow=rgb(67,135,232)
+        } else {
+            base=rgb(226,238,253);border=rgb(38,101,193)
+            foreground=rgb(18,67,149)
+        }
+    }
+    if !enabled{
+        base,border,foreground=rgb(228,234,242),rgb(188,198,211),rgb(115,133,156)
+        topGlow=rgb(238,242,248)
+        shadow=rgb(206,213,225)
+    }
+    lift:=int32(4)
+    if pressed&&enabled {lift=1;base=rgb(29,80,165)}
+    shadowRect:=rect{rc.L+3,rc.T+5,rc.R-3,rc.B}
+    roundedArea(d.Hdc,shadowRect,shadow,shadow,15)
+    surface:=rect{rc.L+1,rc.T+1+(4-lift),rc.R-2,rc.B-lift}
+    roundedArea(d.Hdc,surface,base,border,15)
+    highlightRect:=rect{surface.L+4,surface.T+3,surface.R-4,surface.T+5}
+    if highlightRect.R>highlightRect.L {
+        highlight:=makeBrush(topGlow)
+        paintFill(d.Hdc,highlightRect,highlight)
+        invoke(deleteObject,highlight)
+    }
+    if focused&&enabled {
+        focus:=rect{surface.L+5,surface.T+7,surface.R-5,surface.B-5}
+        outline:=invoke(createPen,0,1,foreground)
+        oldPen:=invoke(selectObject,d.Hdc,outline)
+        oldBrush:=invoke(selectObject,d.Hdc,invoke(getStockObject,5))
+        invoke(roundRect,d.Hdc,uintptr(focus.L),uintptr(focus.T),uintptr(focus.R),uintptr(focus.B),10,10)
         invoke(selectObject,d.Hdc,oldBrush)
         invoke(selectObject,d.Hdc,oldPen)
-        invoke(deleteObject,focusPen)
+        invoke(deleteObject,outline)
     }
     caption:=buttonCaption(id)
     if caption==""{return}
     invoke(setBkMode,d.Hdc,1)
-    invoke(setTextColor,d.Hdc,fg)
-    font:=fontButton
-    if !step{font=fontBody}
+    font:=fontBody
+    if step{font=fontButton}
     oldFont:=invoke(selectObject,d.Hdc,font)
-    textRect:=rc
+    invoke(setTextColor,d.Hdc,foreground)
+    textRect:=surface
     if step {
-        // A separate numeric marker makes the workflow readable at a glance.
-        number:="01"
-        switch id {case 103:number="02";case 115:number="03";case 116:number="04"}
-        size:=int32(32)
-        if rc.R-rc.L<230{size=26}
-        cx:=rc.L+13
-        cy:=rc.T+(rc.B-rc.T-size)/2
-        markerBg:=accentSoft
-        markerFg:=accentColor
-        if primary{markerBg=rgb(75,137,232);markerFg=rgb(255,255,255)}
-        if !enabled{markerBg=rgb(231,236,244);markerFg=dimColor}
-        marker:=rect{cx,cy,cx+size,cy+size}
-        brush:=makeBrush(markerBg)
-        oldBrush:=invoke(selectObject,d.Hdc,brush)
-        pen:=invoke(createPen,0,1,markerBg)
-        oldPen:=invoke(selectObject,d.Hdc,pen)
-        invoke(ellipse,d.Hdc,uintptr(marker.L),uintptr(marker.T),uintptr(marker.R),uintptr(marker.B))
-        invoke(selectObject,d.Hdc,oldBrush);invoke(selectObject,d.Hdc,oldPen)
-        invoke(deleteObject,brush);invoke(deleteObject,pen)
-        invoke(setTextColor,d.Hdc,markerFg)
-        markText:=marker
-        invoke(drawText,d.Hdc,uintptr(unsafe.Pointer(u16(number))),uintptr(^uint32(0)),uintptr(unsafe.Pointer(&markText)),0x25)
-        invoke(setTextColor,d.Hdc,fg)
-        textRect.L=cx+size+9
-        textRect.R-=9
-    } else {textRect.L+=12;textRect.R-=12}
-    // DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS
-    invoke(drawText,d.Hdc,uintptr(unsafe.Pointer(u16(caption))),uintptr(^uint32(0)),uintptr(unsafe.Pointer(&textRect)),0x0020|0x0004|0x00008000)
+        label:="01"
+        switch id{case 103:label="02";case 115:label="03";case 116:label="04"}
+        diameter:=int32(29)
+        if surface.R-surface.L<235 {diameter=25}
+        cx:=surface.L+13
+        cy:=surface.T+(surface.B-surface.T-diameter)/2
+        badgeColor,badgeInk:=rgb(214,229,251),accentColor
+        if primary&&enabled {badgeColor,badgeInk=rgb(93,155,242),rgb(255,255,255)}
+        if !enabled {badgeColor,badgeInk=rgb(209,218,229),rgb(106,125,149)}
+        marker:=rect{cx,cy,cx+diameter,cy+diameter}
+        roundedArea(d.Hdc,marker,badgeColor,badgeColor,int(diameter))
+        invoke(setTextColor,d.Hdc,badgeInk)
+        invoke(selectObject,d.Hdc,fontSmall)
+        invoke(drawText,d.Hdc,uintptr(unsafe.Pointer(u16(label))),uintptr(^uint32(0)),uintptr(unsafe.Pointer(&marker)),0x0025)
+        invoke(selectObject,d.Hdc,font)
+        invoke(setTextColor,d.Hdc,foreground)
+        textRect.L=cx+diameter+10
+        textRect.R-=8
+    } else {
+        textRect.L+=11
+        textRect.R-=8
+    }
+    if pressed&&enabled {textRect.T+=2;textRect.B+=2}
+    invoke(drawText,d.Hdc,uintptr(unsafe.Pointer(u16(caption))),uintptr(^uint32(0)),uintptr(unsafe.Pointer(&textRect)),0x0024|0x00008000)
     invoke(selectObject,d.Hdc,oldFont)
 }
 func buttonCaption(id int) string {

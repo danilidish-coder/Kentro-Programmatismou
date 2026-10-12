@@ -47,7 +47,7 @@ func (s *Store) LatestRun(id string) (Run, error) {
 	return all[0], nil
 }
 func (s *Store) Approve(id string) (string, error) {
-	p, _, e := s.Get(id)
+	p, manifest, e := s.Get(id)
 	if e != nil {
 		return "", e
 	}
@@ -60,13 +60,42 @@ func (s *Store) Approve(id string) (string, error) {
 		return "", e
 	}
 	if run.SourceHash != current {
-		return "", errors.New("Ο κώδικας άλλαξε μετά τα τεστ — απαιτούνται νέοι έλεγχοι")
-	}
-	if IsBlocked(run) {
+        return "",errors.New("Ο κώδικας άλλαξε μετά τα τεστ — απαιτούνται νέοι έλεγχοι")
+    }
+    if run.Stage==StageChecks || run.Stage==StageSetup {
+        return "",errors.New("Δεν εγκρίνεται έκδοση χωρίς πραγματική κατασκευή και έλεγχο EXE")
+    }
+    if run.PlanHash=="" || run.PlanHash!=planDigest(manifest) {
+        return "",errors.New("Το σχέδιο ελέγχων άλλαξε — απαιτούνται νέοι έλεγχοι")
+    }
+    if len(run.Artifacts)==0 {
+        return "",errors.New("Δεν υπάρχει επαληθευμένο Windows EXE προς προώθηση")
+    }
+    verifiedBuild,verifiedLaunch:=false,false
+    for _,result:=range run.Results {
+        if result.Phase=="BUILD" && result.Required && result.Status=="PASS"{verifiedBuild=true}
+        if result.Phase=="SMOKE" && result.Required && result.Status=="PASS"{verifiedLaunch=true}
+    }
+    if !verifiedBuild || !verifiedLaunch {
+        return "",errors.New("Η κατασκευή και η πραγματική εκκίνηση του EXE είναι υποχρεωτικές")
+    }
+    if IsBlocked(run) {
 		return "", errors.New("Αποκλείεται η σταθερή έκδοση: αποτυχία ή έλλειψη υποχρεωτικών τεστ")
 	}
 	root := filepath.Join(s.Root, "projects", id)
-	dst := filepath.Join(root, "stable", run.ID)
+    for _,art:=range run.Artifacts {
+        if !zipPathOK(art.Name) || !strings.HasSuffix(strings.ToLower(art.Name),".exe") {
+            return "",errors.New("Μη ασφαλές ή μη εκτελέσιμο αρχείο προς έγκριση")
+        }
+        path:=filepath.Join(root,"runs",run.ID,"artifacts",filepath.FromSlash(art.Name))
+        data,e:=os.ReadFile(path)
+        if e!=nil{return "",errors.New("Λείπει το ελεγμένο EXE: "+e.Error())}
+        digest:=sha256.Sum256(data)
+        if hex.EncodeToString(digest[:])!=art.SHA256 || int64(len(data))!=art.Bytes {
+            return "",errors.New("Αλλοιώθηκε το παραγόμενο EXE μετά τους ελέγχους")
+        }
+    }
+    dst := filepath.Join(root, "stable", run.ID)
 	if exists(dst) {
 		return dst, nil
 	}

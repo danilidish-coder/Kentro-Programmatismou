@@ -106,10 +106,26 @@ func updateProjectStage() {
     if btn:=ui.buttons[116];btn!=0 {invoke(enableWindow,btn,0)}
     index:=invoke(sendMessage,ui.list,lbGetCurSel,0,0)
     if index==^uintptr(0)||int(index)>=len(ui.ids) {
+        if ui.projectDetail!=0 {
+            invoke(sendMessage,ui.projectDetail,wmSetText,0,uintptr(unsafe.Pointer(u16("ΕΠΙΛΕΓΜΕΝΟ ΠΡΟΓΡΑΜΜΑ\nΔεν έχει εισαχθεί ή επιλεγεί έργο"))))
+        }
         showStage("1/4 · Εισάγετε ή επιλέξτε έργο")
         return
     }
     id:=ui.ids[int(index)]
+    if ui.projectDetail!=0 {
+        p,manifest,detailErr:=ui.store.Get(id)
+        if detailErr==nil {
+            ver:=p.Version
+            if ver==""{ver="χωρίς αριθμό έκδοσης"}
+            name:=p.Name
+            if len([]rune(name))>34{name=string([]rune(name)[:31])+"..."}
+            info:=fmt.Sprintf("ΕΠΙΛΕΓΜΕΝΟ ΠΡΟΓΡΑΜΜΑ: %s\nΈκδοση %s · %s · %d έλεγχοι / %d stress",name,ver,p.Language,len(manifest.Tests),len(manifest.Stress))
+            invoke(sendMessage,ui.projectDetail,wmSetText,0,uintptr(unsafe.Pointer(u16(info))))
+        } else {
+            invoke(sendMessage,ui.projectDetail,wmSetText,0,uintptr(unsafe.Pointer(u16("Αδυναμία ανάγνωσης του επιλεγμένου έργου"))))
+        }
+    }
     run,err:=ui.store.LatestChecks(id)
     if err!=nil {showStage("2/4 · Αναμονή λειτουργικών ελέγχων και stress tests");return}
     if engine.IsChecksBlocked(run) {showStage("2/4 · Εντοπίστηκαν προβλήματα — EXE αποκλεισμένο");return}
