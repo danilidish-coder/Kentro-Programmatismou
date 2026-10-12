@@ -51,6 +51,7 @@ const (
 	lbSetCurSel        = 0x0186
 	lbDeleteString     = 0x0182
 	lbGetCount         = 0x018B
+	lbGetTextLen       = 0x018A
 	lbSetTopIndex      = 0x0197
 	mbYesNo            = 0x00000004
 	mbIconWarning      = 0x30
@@ -82,6 +83,9 @@ var (
 	killTimer        = user32.NewProc("KillTimer")
 	getStockObject   = gdi32.NewProc("GetStockObject")
 	loadCursor       = user32.NewProc("LoadCursorW")
+	getCursorPos     = user32.NewProc("GetCursorPos")
+	getWindowRect    = user32.NewProc("GetWindowRect")
+	invalidateRect   = user32.NewProc("InvalidateRect")
 )
 
 func u16(x string) *uint16                             { return syscall.StringToUTF16Ptr(x) }
@@ -108,13 +112,14 @@ type wndClass struct {
 	IconSmall                          uintptr
 }
 type event struct {
-	line    string
-	done    bool
-	refresh bool
+    line string
+    done bool
+    refresh bool
+    selectProject string
 }
 
 var ui struct {
-	main, list, output, emptyHint, header, brand, subhead, projectTitle, actionTitle, resultsTitle, footer, stageStatus uintptr
+	main, list, output, emptyHint, projectDetail, header, brand, subhead, projectTitle, actionTitle, resultsTitle, footer, stageStatus uintptr
 	buttons                                                                                     map[int]uintptr
 	fonts                                                                                       []uintptr
 	store                                                                                       *engine.Store
@@ -126,6 +131,7 @@ var ui struct {
 	mu                                                                                          sync.Mutex
 	pending                                                                                     []event
 	advanced                                                                                    bool
+	hoverButton                                                                                 int
 	stage                                                                                       string
 	started                                                                                     time.Time
 	current                                                                                     string
@@ -207,6 +213,8 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
         invoke(sendMessage,ui.footer,wmSetFont,fontSmall,1)
 		ui.list = control("LISTBOX", "", wsChildVisible|wsTabStop|wsVscroll|0x0001|0x0040, 90, 28, 200, 275, 450)
         ui.emptyHint = control("STATIC", "Δεν υπάρχουν έργα ακόμη.\n\nΞεκινήστε με εισαγωγή ZIP.", wsChildVisible, 92, 38, 270, 245, 80)
+        ui.projectDetail = control("STATIC", "ΕΠΙΛΕΓΜΕΝΟ ΕΡΓΟ\nΔεν έχει εισαχθεί ακόμη πρόγραμμα", wsChildVisible, 94, 26, 210, 278, 52)
+        invoke(sendMessage, ui.projectDetail, wmSetFont, fontBody, 1)
         invoke(sendMessage, ui.emptyHint, wmSetFont, fontBody, 1)
 		// Only the actions requested by a non-programmer are on the home screen.
 		// Backup/version management still happens inside the local engine.
@@ -232,6 +240,7 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		invoke(sendMessage, ui.output, wmSetFont, fontBody, 1)
 		appendOutput("Ακολουθήστε τη σειρά: εισαγωγή → έλεγχοι/stress → αναφορά → EXE → προαιρετικό Setup.")
 		invoke(setTimer, hwnd, 1, 1000, 0)
+		invoke(setTimer, hwnd, 2, 90, 0)
 		layout(hwnd)
 		refreshList()
 		return 0
@@ -244,6 +253,7 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		}
 		return 0
 	case wmTimer:
+        if w==2 {updateButtonHover();return 0}
 		if ui.busy {
 			elapsed := time.Since(ui.started).Round(time.Second)
 			caption := fmt.Sprintf("%s • %s • %d επιτυχίες • %d προβλήματα", ui.stage, elapsed, ui.completedPass, ui.completedFail)
@@ -291,7 +301,9 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		ui.mu.Unlock()
 		refresh := false
 		finished := false
+		selectNew := ""
 		for _, ev := range events {
+			if ev.selectProject!="" {selectNew=ev.selectProject}
 			if ev.line != "" {
 				if strings.HasPrefix(ev.line, "TEST:") || strings.HasPrefix(ev.line, "STRESS:") || strings.HasPrefix(ev.line, "BUILD:") || strings.HasPrefix(ev.line, "SMOKE:") || strings.HasPrefix(ev.line, "VISUAL:") || strings.HasPrefix(ev.line, "INTEGRITY:") {
 					ui.current = ev.line
@@ -315,9 +327,16 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 				finished = true
 			}
 		}
-		if refresh {
-			refreshList()
-		}
+		if refresh {refreshList()}
+        if selectNew!="" {
+            for i,id:=range ui.ids {
+                if id==selectNew {
+                    invoke(sendMessage,ui.list,lbSetCurSel,uintptr(i),0)
+                    updateProjectStage()
+                    break
+                }
+            }
+        }
 		if finished {
 			ui.busy = false
 			invoke(sendMessage, ui.footer, wmSetText, 0, uintptr(unsafe.Pointer(u16("Η εργασία ολοκληρώθηκε • Δείτε την αναφορά και προχωρήστε μόνο όταν είστε έτοιμοι"))))
@@ -339,11 +358,29 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		return 0
 	case wmDestroy:
 		invoke(killTimer, hwnd, 1)
+		invoke(killTimer, hwnd, 2)
 		releaseTheme()
 		invoke(postQuit, 0)
 		return 0
 	}
 	return invoke(defWindowProc, hwnd, uintptr(m), w, l)
+}
+func updateButtonHover(){
+    if ui.main==0 || len(ui.buttons)==0{return}
+    var pt point
+    if invoke(getCursorPos,uintptr(unsafe.Pointer(&pt)))==0{return}
+    hovering:=0
+    for id,button:=range ui.buttons{
+        if button==0 || invoke(isWindowEnabled,button)==0{continue}
+        var bounds rect
+        if invoke(getWindowRect,button,uintptr(unsafe.Pointer(&bounds)))==0{continue}
+        if pt.X>=bounds.L && pt.X<bounds.R && pt.Y>=bounds.T && pt.Y<bounds.B {hovering=id;break}
+    }
+    if hovering==ui.hoverButton{return}
+    previous:=ui.hoverButton
+    ui.hoverButton=hovering
+    if old:=ui.buttons[previous];old!=0 {invoke(invalidateRect,old,0,1)}
+    if next:=ui.buttons[hovering];next!=0{invoke(invalidateRect,next,0,1)}
 }
 func layout(hwnd uintptr) {
 	if ui.list == 0 {
@@ -372,8 +409,9 @@ func layout(hwnd uintptr) {
         invoke(moveWindow,ui.buttons[101],22,136,uintptr(mainX-34),48,1)
         listHeight:=h-340
         if listHeight<175{listHeight=175}
-        invoke(moveWindow,ui.list,22,194,uintptr(mainX-34),uintptr(listHeight),1)
-        invoke(moveWindow,ui.emptyHint,39,uintptr(258),uintptr(mainX-70),105,1)
+        invoke(moveWindow,ui.list,22,253,uintptr(mainX-34),uintptr(h-388),1)
+        invoke(moveWindow,ui.projectDetail,35,194,uintptr(mainX-60),54,1)
+        invoke(moveWindow,ui.emptyHint,39,uintptr(314),uintptr(mainX-70),105,1)
         invoke(moveWindow,ui.buttons[113],22,uintptr(h-126),uintptr(mainX-34),42,1)
         invoke(moveWindow,ui.buttons[114],22,uintptr(h-78),uintptr(mainX-34),36,1)
         invoke(moveWindow,ui.buttons[103],uintptr(mainX),153,uintptr(contentW),49,1)
@@ -389,8 +427,9 @@ func layout(hwnd uintptr) {
         invoke(moveWindow,ui.actionTitle,uintptr(mainX),115,uintptr(contentW),25,1)
         invoke(moveWindow,ui.stageStatus,uintptr(mainX),145,uintptr(contentW),22,1)
         invoke(moveWindow,ui.buttons[101],24,154,uintptr(mainX-30),58,1)
-        invoke(moveWindow,ui.list,24,226,uintptr(mainX-30),uintptr(h-425),1)
-        invoke(moveWindow,ui.emptyHint,43,290,uintptr(mainX-76),108,1)
+        invoke(moveWindow,ui.list,24,294,uintptr(mainX-30),uintptr(h-495),1)
+        invoke(moveWindow,ui.projectDetail,38,230,uintptr(mainX-66),57,1)
+        invoke(moveWindow,ui.emptyHint,43,356,uintptr(mainX-76),108,1)
         invoke(moveWindow,ui.buttons[113],24,uintptr(h-177),uintptr(mainX-30),47,1)
         invoke(moveWindow,ui.buttons[114],24,uintptr(h-121),uintptr(mainX-30),40,1)
         invoke(moveWindow,ui.buttons[103],uintptr(mainX),175,uintptr(contentW),66,1)
