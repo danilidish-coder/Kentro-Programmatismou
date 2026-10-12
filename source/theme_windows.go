@@ -124,7 +124,6 @@ func paintBackground(hwnd uintptr) {
     // Solid white cards with subtle border, generous whitespace.
     roundedArea(dc,rect{15,110,mainX-12,h-50},panelColor,lineColor,18)
     roundedArea(dc,rect{mainX-9,110,w-15,h-50},panelColor,lineColor,18)
-    roundedArea(dc,rect{mainX+6,0,w-28,0},fieldColor,lineColor,12) // no-op
     // Brand monogram.
     roundedArea(dc,rect{25,19,73,69},accentSoft,accentSoft,15)
     // Progress rail: a quiet four-step cue. The active stage is in the live label.
@@ -193,8 +192,9 @@ func drawButton(d *drawItemStruct) {
     if caption==""{return}
     invoke(setBkMode,d.Hdc,1)
     invoke(setTextColor,d.Hdc,fg)
-    oldFont:=invoke(selectObject,d.Hdc,fontButton)
-    if !step{old:=invoke(selectObject,d.Hdc,fontBody);invoke(selectObject,d.Hdc,oldFont);oldFont=old}
+    font:=fontButton
+    if !step{font=fontBody}
+    oldFont:=invoke(selectObject,d.Hdc,font)
     textRect:=rc
     if step {
         // A separate numeric marker makes the workflow readable at a glance.
