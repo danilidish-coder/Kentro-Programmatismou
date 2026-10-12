@@ -114,7 +114,7 @@ type event struct {
 }
 
 var ui struct {
-	main, list, output, header, brand, subhead, projectTitle, actionTitle, resultsTitle, footer, stageStatus uintptr
+	main, list, output, emptyHint, header, brand, subhead, projectTitle, actionTitle, resultsTitle, footer, stageStatus uintptr
 	buttons                                                                                     map[int]uintptr
 	fonts                                                                                       []uintptr
 	store                                                                                       *engine.Store
@@ -206,6 +206,8 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
         invoke(sendMessage,ui.subhead,wmSetFont,fontSmall,1)
         invoke(sendMessage,ui.footer,wmSetFont,fontSmall,1)
 		ui.list = control("LISTBOX", "", wsChildVisible|wsTabStop|wsVscroll|0x0001|0x0040, 90, 28, 200, 275, 450)
+        ui.emptyHint = control("STATIC", "Δεν υπάρχουν έργα ακόμη.\n\nΞεκινήστε με εισαγωγή ZIP.", wsChildVisible, 92, 38, 270, 245, 80)
+        invoke(sendMessage, ui.emptyHint, wmSetFont, fontBody, 1)
 		// Only the actions requested by a non-programmer are on the home screen.
 		// Backup/version management still happens inside the local engine.
 		btns := []struct {
@@ -371,6 +373,7 @@ func layout(hwnd uintptr) {
         listHeight:=h-340
         if listHeight<175{listHeight=175}
         invoke(moveWindow,ui.list,22,194,uintptr(mainX-34),uintptr(listHeight),1)
+        invoke(moveWindow,ui.emptyHint,39,uintptr(258),uintptr(mainX-70),105,1)
         invoke(moveWindow,ui.buttons[113],22,uintptr(h-126),uintptr(mainX-34),42,1)
         invoke(moveWindow,ui.buttons[114],22,uintptr(h-78),uintptr(mainX-34),36,1)
         invoke(moveWindow,ui.buttons[103],uintptr(mainX),153,uintptr(contentW),49,1)
@@ -387,6 +390,7 @@ func layout(hwnd uintptr) {
         invoke(moveWindow,ui.stageStatus,uintptr(mainX),145,uintptr(contentW),22,1)
         invoke(moveWindow,ui.buttons[101],24,154,uintptr(mainX-30),58,1)
         invoke(moveWindow,ui.list,24,226,uintptr(mainX-30),uintptr(h-425),1)
+        invoke(moveWindow,ui.emptyHint,43,290,uintptr(mainX-76),108,1)
         invoke(moveWindow,ui.buttons[113],24,uintptr(h-177),uintptr(mainX-30),47,1)
         invoke(moveWindow,ui.buttons[114],24,uintptr(h-121),uintptr(mainX-30),40,1)
         invoke(moveWindow,ui.buttons[103],uintptr(mainX),175,uintptr(contentW),66,1)
