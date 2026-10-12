@@ -148,7 +148,17 @@ func startApp() {
 		msgbox(0, "Αδυναμία εκκίνησης του παραθύρου", "Σφάλμα", 0x10)
 		return
 	}
-	ui.main = invoke(createWindow, 0, uintptr(unsafe.Pointer(cls)), uintptr(unsafe.Pointer(u16("Κέντρο Προγραμματισμού"))), wsOverlappedWindow|wsClipChildren, 110, 80, 1120, 790, 0, 0, inst, 0)
+	screenWidth:=int(invoke(user32.NewProc("GetSystemMetrics"),0))
+    screenHeight:=int(invoke(user32.NewProc("GetSystemMetrics"),1))
+    windowWidth,windowHeight:=1120,790
+    if screenWidth>0 && screenWidth<windowWidth+48 {windowWidth=screenWidth-36}
+    if screenHeight>0 && screenHeight<windowHeight+82 {windowHeight=screenHeight-80}
+    if windowWidth<860{windowWidth=860}
+    if windowHeight<590{windowHeight=590}
+    left,top:=25,25
+    if screenWidth>windowWidth{left=(screenWidth-windowWidth)/2}
+    if screenHeight>windowHeight+35{top=(screenHeight-windowHeight-35)/2}
+    ui.main = invoke(createWindow, 0, uintptr(unsafe.Pointer(cls)), uintptr(unsafe.Pointer(u16("Κέντρο Προγραμματισμού"))), wsOverlappedWindow|wsClipChildren, uintptr(left), uintptr(top), uintptr(windowWidth), uintptr(windowHeight), 0, 0, inst, 0)
 	if ui.main == 0 {
 		return
 	}
@@ -239,7 +249,7 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		if l != 0 {
 			var info minMaxInfo
 			invoke(copyNativeMemory, uintptr(unsafe.Pointer(&info)), l, unsafe.Sizeof(info))
-			info.MinTrackSize = point{X: 920, Y: 680}
+			info.MinTrackSize = point{X: 860, Y: 590}
 			invoke(copyNativeMemory, l, uintptr(unsafe.Pointer(&info)), unsafe.Sizeof(info))
 		}
 		return 0
@@ -336,30 +346,51 @@ func layout(hwnd uintptr) {
 	if w < 850 {
 		w = 850
 	}
-	if h < 630 {
-		h = 630
+	if h < 520 {
+		h = 520
 	}
-	const mainX = 332
-	contentW := w - mainX - 26
-	half := (contentW - 12) / 2
-	invoke(moveWindow, ui.brand, 24, 20, 44, 40, 1)
-	invoke(moveWindow, ui.header, 80, 18, uintptr(w-95), 42, 1)
-	invoke(moveWindow, ui.subhead, 81, 61, uintptr(w-100), 25, 1)
-	invoke(moveWindow, ui.projectTitle, 26, 121, 270, 26, 1)
-	invoke(moveWindow, ui.actionTitle, uintptr(mainX), 115, uintptr(contentW), 25, 1)
-	invoke(moveWindow, ui.stageStatus, uintptr(mainX), 145, uintptr(contentW), 22, 1)
-	invoke(moveWindow, ui.buttons[101], 24, 154, 278, 58, 1)
-	invoke(moveWindow, ui.list, 24, 226, 278, uintptr(h-425), 1)
-	invoke(moveWindow, ui.buttons[113], 24, uintptr(h-177), 278, 47, 1)
-	invoke(moveWindow, ui.buttons[114], 24, uintptr(h-121), 278, 40, 1)
-	invoke(moveWindow, ui.buttons[103], uintptr(mainX), 175, uintptr(contentW), 66, 1)
-    invoke(moveWindow, ui.buttons[104], uintptr(mainX), 253, uintptr(half), 46, 1)
-    invoke(moveWindow, ui.buttons[105], uintptr(mainX+half+12), 253, uintptr(half), 46, 1)
-    invoke(moveWindow, ui.buttons[115], uintptr(mainX), 311, uintptr(half), 56, 1)
-    invoke(moveWindow, ui.buttons[116], uintptr(mainX+half+12), 311, uintptr(half), 56, 1)
-    invoke(moveWindow, ui.buttons[111], uintptr(mainX), 378, uintptr(contentW), 36, 1)
-    invoke(moveWindow, ui.resultsTitle, uintptr(mainX), 432, uintptr(contentW), 27, 1)
-    invoke(moveWindow, ui.output, uintptr(mainX+12), 469, uintptr(contentW-24), uintptr(h-543), 1)
-	invoke(moveWindow, ui.footer, 24, uintptr(h-38), uintptr(w-48), 25, 1)
+    mainX:=332
+    if w<950{mainX=309}
+    contentW:=w-mainX-22
+    half:=(contentW-12)/2
+    invoke(moveWindow,ui.brand,24,20,44,40,1)
+    invoke(moveWindow,ui.header,80,18,uintptr(w-95),42,1)
+    invoke(moveWindow,ui.subhead,81,61,uintptr(w-100),25,1)
+    if h<705 {
+        invoke(moveWindow,ui.projectTitle,24,101,268,25,1)
+        invoke(moveWindow,ui.actionTitle,uintptr(mainX),97,uintptr(contentW),24,1)
+        invoke(moveWindow,ui.stageStatus,uintptr(mainX),124,uintptr(contentW),21,1)
+        invoke(moveWindow,ui.buttons[101],22,136,uintptr(mainX-34),48,1)
+        listHeight:=h-340
+        if listHeight<175{listHeight=175}
+        invoke(moveWindow,ui.list,22,194,uintptr(mainX-34),uintptr(listHeight),1)
+        invoke(moveWindow,ui.buttons[113],22,uintptr(h-126),uintptr(mainX-34),42,1)
+        invoke(moveWindow,ui.buttons[114],22,uintptr(h-78),uintptr(mainX-34),36,1)
+        invoke(moveWindow,ui.buttons[103],uintptr(mainX),153,uintptr(contentW),49,1)
+        invoke(moveWindow,ui.buttons[104],uintptr(mainX),211,uintptr(half),42,1)
+        invoke(moveWindow,ui.buttons[105],uintptr(mainX+half+12),211,uintptr(half),42,1)
+        invoke(moveWindow,ui.buttons[115],uintptr(mainX),261,uintptr(half),49,1)
+        invoke(moveWindow,ui.buttons[116],uintptr(mainX+half+12),261,uintptr(half),49,1)
+        invoke(moveWindow,ui.buttons[111],uintptr(mainX),319,uintptr(contentW),31,1)
+        invoke(moveWindow,ui.resultsTitle,uintptr(mainX),361,uintptr(contentW),26,1)
+        invoke(moveWindow,ui.output,uintptr(mainX+10),397,uintptr(contentW-20),uintptr(h-444),1)
+    }else{
+        invoke(moveWindow,ui.projectTitle,26,121,270,26,1)
+        invoke(moveWindow,ui.actionTitle,uintptr(mainX),115,uintptr(contentW),25,1)
+        invoke(moveWindow,ui.stageStatus,uintptr(mainX),145,uintptr(contentW),22,1)
+        invoke(moveWindow,ui.buttons[101],24,154,uintptr(mainX-30),58,1)
+        invoke(moveWindow,ui.list,24,226,uintptr(mainX-30),uintptr(h-425),1)
+        invoke(moveWindow,ui.buttons[113],24,uintptr(h-177),uintptr(mainX-30),47,1)
+        invoke(moveWindow,ui.buttons[114],24,uintptr(h-121),uintptr(mainX-30),40,1)
+        invoke(moveWindow,ui.buttons[103],uintptr(mainX),175,uintptr(contentW),66,1)
+        invoke(moveWindow,ui.buttons[104],uintptr(mainX),253,uintptr(half),46,1)
+        invoke(moveWindow,ui.buttons[105],uintptr(mainX+half+12),253,uintptr(half),46,1)
+        invoke(moveWindow,ui.buttons[115],uintptr(mainX),311,uintptr(half),56,1)
+        invoke(moveWindow,ui.buttons[116],uintptr(mainX+half+12),311,uintptr(half),56,1)
+        invoke(moveWindow,ui.buttons[111],uintptr(mainX),378,uintptr(contentW),36,1)
+        invoke(moveWindow,ui.resultsTitle,uintptr(mainX),432,uintptr(contentW),27,1)
+        invoke(moveWindow,ui.output,uintptr(mainX+12),469,uintptr(contentW-24),uintptr(h-543),1)
+    }
+    invoke(moveWindow,ui.footer,24,uintptr(h-35),uintptr(w-48),25,1)
 	invoke(user32.NewProc("InvalidateRect"), hwnd, 0, 1)
 }
