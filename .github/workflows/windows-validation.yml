@@ -28,6 +28,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go vet ./...
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -count=3 -timeout 8m ./engine 2>&1 | Tee-Object -FilePath ../build/windows-regression-repeat.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -race -count=1 -timeout 8m ./engine 2>&1 | Tee-Object -FilePath ../build/windows-race.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -54,6 +58,9 @@ jobs:
       - name: Exercise native GUI and ZIP button crash regression
         shell: powershell
         run: .\ci\windows-smoke.ps1
+      - name: Verify live GUI layout archive removal and restoration
+        shell: powershell
+        run: .\\ci\\windows-usability.ps1
       - name: Preserve reports even if the release gate fails
         if: always()
         uses: actions/upload-artifact@v4
@@ -61,6 +68,9 @@ jobs:
           name: kentro-test-reports
           path: |
             build/windows-unit.log
+            build/windows-regression-repeat.log
+            build/windows-race.log
+            build/windows-usability.log
             build/windows-python-end-to-end.log
             build/windows-ui-smoke.log
           if-no-files-found: warn
