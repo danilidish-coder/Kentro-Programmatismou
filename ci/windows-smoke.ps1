@@ -63,6 +63,32 @@ try {
       }
     } catch { Trace "NOT RUN: screenshot unsupported on runner: $($_.Exception.Message)" }
 
+    # Verify four visible stages and non-overlapping native controls.
+    function Get-ById([string]$cls,[int]$id) {
+        $after = [IntPtr]::Zero
+        while ($true) {
+            $next = [UIMessage]::FindWindowEx($hwnd,$after,$cls,$null)
+            if ($next -eq [IntPtr]::Zero) { break }
+            if ([UIMessage]::GetDlgCtrlID($next) -eq $id) { return $next }
+            $after = $next
+        }
+        throw "FAIL: missing control ID $id"
+    }
+    $ordered=@(103,115,116)
+    $controlRects=@{}
+    foreach($id in $ordered){
+        $handle = Get-ById 'Button' $id
+        $rc2=[UIMessage+Rect]::new()
+        if(-not [UIMessage]::GetWindowRect($handle,[ref]$rc2)){throw "FAIL: stage $id has no rectangle"}
+        $controlRects[$id]=$rc2
+    }
+    if($controlRects[103].B -gt $controlRects[115].T){throw 'FAIL: check and EXE stages overlap'}
+    if([Math]::Abs($controlRects[115].T-$controlRects[116].T) -gt 2){throw 'FAIL: EXE and Setup are not separate adjacent buttons'}
+    $outRect=[UIMessage+Rect]::new()
+    if(-not [UIMessage]::GetWindowRect($results,[ref]$outRect)){throw 'FAIL: results rect missing'}
+    if($controlRects[116].B -gt $outRect.T){throw 'FAIL: Setup button overlaps output report'}
+    Trace 'PASS: visible ordered checks/report/EXE/optional Setup controls do not overlap'
+
     [UIMessage]::PostMessage($hwnd,0x0111,[IntPtr]101,[IntPtr]::Zero) | Out-Null
     $picker = $null
     for ($i=0;$i -lt 50;$i++) {
