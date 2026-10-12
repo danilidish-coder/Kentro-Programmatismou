@@ -70,6 +70,7 @@ var (
 	moveWindow       = user32.NewProc("MoveWindow")
 	getClientRect    = user32.NewProc("GetClientRect")
 	getModuleHandle  = kernel32.NewProc("GetModuleHandleW")
+	copyNativeMemory = kernel32.NewProc("RtlMoveMemory")
 	getStockObject   = gdi32.NewProc("GetStockObject")
 	loadCursor       = user32.NewProc("LoadCursorW")
 )
@@ -198,8 +199,10 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		return 0
 	case wmGetMinMaxInfo:
 		if l != 0 {
-			info := (*minMaxInfo)(unsafe.Pointer(l))
+			var info minMaxInfo
+			invoke(copyNativeMemory, uintptr(unsafe.Pointer(&info)), l, unsafe.Sizeof(info))
 			info.MinTrackSize = point{X: 920, Y: 680}
+			invoke(copyNativeMemory, l, uintptr(unsafe.Pointer(&info)), unsafe.Sizeof(info))
 		}
 		return 0
 	case wmEraseBkgnd:
@@ -209,7 +212,9 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		return 0
 	case wmDrawItem:
 		if l != 0 {
-			drawButton((*drawItemStruct)(unsafe.Pointer(l)))
+			var item drawItemStruct
+			invoke(copyNativeMemory, uintptr(unsafe.Pointer(&item)), l, unsafe.Sizeof(item))
+			drawButton(&item)
 		}
 		return 1
 	case wmCtlColorStatic:
