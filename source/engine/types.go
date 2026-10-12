@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sort"
 	"time"
 )
 
@@ -106,7 +107,7 @@ func NewStore(root string) (*Store, error) {
 	if root == "" {
 		root = DefaultRoot()
 	}
-	for _, dir := range []string{"projects", "reports", "backups"} {
+	for _, dir := range []string{"projects", "reports", "backups", "removed"} {
 		if e := os.MkdirAll(filepath.Join(root, dir), 0700); e != nil {
 			return nil, e
 		}
@@ -273,4 +274,77 @@ func validateStep(s Step) error {
 		}
 	}
 	return nil
+}
+
+
+// ArchiveProject removes an imported project from the active list without deleting data.
+// The whole project directory (including reports, stable builds and history) is retained.
+func (s *Store) ArchiveProject(id string) (string, error) {
+	if _, _, err := s.Get(id); err != nil {
+		return "", err
+	}
+	src, err := s.Base(id)
+	if err != nil {
+		return "", err
+	}
+	archiveDir := filepath.Join(s.Root, "removed")
+	if err := os.MkdirAll(archiveDir, 0700); err != nil {
+		return "", err
+	}
+	name := time.Now().UTC().Format("20060102T150405.000000000") + "-" + id
+	dst := filepath.Join(archiveDir, name)
+	if _, err := os.Stat(dst); err == nil {
+		return "", errors.New("Υπάρχει ήδη αρχείο με αυτό το όνομα")
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	if err := os.Rename(src, dst); err != nil {
+		return "", fmt.Errorf("Δεν ήταν δυνατή η αφαίρεση του έργου: %w", err)
+	}
+	return dst, nil
+}
+
+// RestoreLastRemoved restores the most recently archived project to the active list.
+func (s *Store) RestoreLastRemoved() (Project, error) {
+	var p Project
+	archiveDir := filepath.Join(s.Root, "removed")
+	entries, err := os.ReadDir(archiveDir)
+	if err != nil {
+		return p, err
+	}
+	names := make([]string, 0, len(entries))
+	for _, item := range entries {
+		if item.IsDir() {
+			names = append(names, item.Name())
+		}
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(names)))
+	for _, name := range names {
+		if len(name) < 31 || name[24] != '-' {
+			continue
+		}
+		id := name[25:]
+		if !validID(id) {
+			continue
+		}
+		src := filepath.Join(archiveDir, name)
+		data, err := os.ReadFile(filepath.Join(src, "project.json"))
+		if err != nil || json.Unmarshal(data, &p) != nil || p.ID != id {
+			continue
+		}
+		dst, err := s.Base(id)
+		if err != nil {
+			return Project{}, err
+		}
+		if _, err := os.Stat(dst); err == nil {
+			return Project{}, errors.New("Το έργο υπάρχει ήδη στην ενεργή λίστα")
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return Project{}, err
+		}
+		if err := os.Rename(src, dst); err != nil {
+			return Project{}, fmt.Errorf("Δεν ήταν δυνατή η επαναφορά: %w", err)
+		}
+		return p, nil
+	}
+	return Project{}, errors.New("Δεν υπάρχουν αφαιρεμένα έργα προς επαναφορά")
 }
