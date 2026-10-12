@@ -114,7 +114,7 @@ type event struct {
 }
 
 var ui struct {
-	main, list, output, header, brand, subhead, projectTitle, actionTitle, resultsTitle, footer uintptr
+	main, list, output, header, brand, subhead, projectTitle, actionTitle, resultsTitle, footer, stageStatus uintptr
 	buttons                                                                                     map[int]uintptr
 	fonts                                                                                       []uintptr
 	store                                                                                       *engine.Store
@@ -126,6 +126,7 @@ var ui struct {
 	mu                                                                                          sync.Mutex
 	pending                                                                                     []event
 	advanced                                                                                    bool
+	stage                                                                                       string
 	started                                                                                     time.Time
 	current                                                                                     string
 	completedPass, completedFail, completedSkipped                                              int
@@ -184,8 +185,9 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		invoke(sendMessage, ui.brand, wmSetFont, fontHeading, 1)
 		ui.subhead = control("STATIC", "ΜΟΝΟ ΣΤΟΝ ΥΠΟΛΟΓΙΣΤΗ ΣΟΥ  •  ΕΚΔΟΣΗ "+engine.ProductVersion, wsChildVisible, 0, 86, 61, 800, 24)
 		ui.projectTitle = control("STATIC", "ΤΑ ΕΡΓΑ ΜΟΥ", wsChildVisible, 0, 28, 105, 250, 28)
-		ui.actionTitle = control("STATIC", "ΔΗΜΙΟΥΡΓΙΑ ΠΡΟΓΡΑΜΜΑΤΟΣ", wsChildVisible, 0, 345, 105, 660, 28)
-		ui.resultsTitle = control("STATIC", "ΑΠΟΤΕΛΕΣΜΑΤΑ ΕΛΕΓΧΟΥ", wsChildVisible, 0, 345, 452, 660, 27)
+		ui.actionTitle = control("STATIC", "ΣΤΑΔΙΑ ΕΡΓΑΣΙΑΣ", wsChildVisible, 0, 345, 105, 660, 28)
+		ui.stageStatus = control("STATIC", "1. Εισαγωγή → 2. Έλεγχοι → 3. EXE → 4. Setup (προαιρετικό)", wsChildVisible, 0, 345, 144, 650, 23)
+		ui.resultsTitle = control("STATIC", "ΠΡΟΟΔΟΣ ΚΑΙ ΑΠΟΤΕΛΕΣΜΑΤΑ", wsChildVisible, 0, 345, 430, 660, 27)
 		ui.footer = control("STATIC", "Τοπική λειτουργία • Τα έργα παραμένουν στον υπολογιστή", wsChildVisible, 0, 28, 690, 860, 28)
 		ui.list = control("LISTBOX", "", wsChildVisible|wsTabStop|wsVscroll|0x0001|0x0040, 90, 28, 200, 275, 450)
 		// Only the actions requested by a non-programmer are on the home screen.
@@ -195,7 +197,9 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 			label string
 		}{
 			{101, "Εισαγωγή αρχείου ZIP"},
-			{103, "Δοκιμές και δημιουργία EXE"},
+			{103, "Έλεγχοι και stress tests"},
+			{115, "Δημιουργία EXE"},
+			{116, "Προαιρετικό Setup"},
 			{104, "Προβολή αποτελεσμάτων"},
 			{105, "Αναφορά για το ChatGPT"},
 			{111, "Ακύρωση δοκιμών"},
@@ -208,7 +212,7 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		invoke(enableWindow, ui.buttons[111], 0)
 		ui.output = control("LISTBOX", "", wsChildVisible|wsVscroll|0x0040, 91, 345, 390, 680, 230)
 		invoke(sendMessage, ui.output, wmSetFont, fontBody, 1)
-		appendOutput("Εισάγετε ZIP, επιλέξτε έργο και πατήστε Δοκιμές και δημιουργία EXE.")
+		appendOutput("Ακολουθήστε τη σειρά: εισαγωγή → έλεγχοι/stress → αναφορά → EXE → προαιρετικό Setup.")
 		invoke(setTimer, hwnd, 1, 1000, 0)
 		layout(hwnd)
 		refreshList()
@@ -224,7 +228,7 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 	case wmTimer:
 		if ui.busy {
 			elapsed := time.Since(ui.started).Round(time.Second)
-			caption := fmt.Sprintf("Εκτελείται έλεγχος • %s • %d επιτυχίες • %d προβλήματα", elapsed, ui.completedPass, ui.completedFail)
+			caption := fmt.Sprintf("%s • %s • %d επιτυχίες • %d προβλήματα", ui.stage, elapsed, ui.completedPass, ui.completedFail)
 			invoke(sendMessage, ui.footer, wmSetText, 0, uintptr(unsafe.Pointer(u16(caption))))
 		}
 		return 0
@@ -257,8 +261,10 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		return colorField(w)
 	case wmCommand:
 		if w>>16 == 0 {
-			onButton(int(w & 0xffff))
-		}
+            onButton(int(w & 0xffff))
+        } else if int(w & 0xffff)==90 && w>>16==1 {
+            updateProjectStage()
+        }
 		return 0
 	case wmApp + 3:
 		ui.mu.Lock()
@@ -271,9 +277,9 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 			if ev.line != "" {
 				if strings.HasPrefix(ev.line, "TEST:") || strings.HasPrefix(ev.line, "STRESS:") || strings.HasPrefix(ev.line, "BUILD:") || strings.HasPrefix(ev.line, "SMOKE:") || strings.HasPrefix(ev.line, "VISUAL:") || strings.HasPrefix(ev.line, "INTEGRITY:") {
 					ui.current = ev.line
+					showStage(ui.stage + "  •  " + ev.line)
 					if strings.HasSuffix(ev.line, " — PASS") {
 						ui.completedPass++
-						continue // Technical PASS spam belongs in the full report, not the home page.
 					}
 					if strings.Contains(ev.line, " — FAIL") {
 						ui.completedFail++
@@ -296,7 +302,8 @@ func wndProc(hwnd uintptr, m uint32, w, l uintptr) uintptr {
 		}
 		if finished {
 			ui.busy = false
-			invoke(sendMessage, ui.footer, wmSetText, 0, uintptr(unsafe.Pointer(u16("Η εργασία ολοκληρώθηκε • Πατήστε «Αποτελέσματα»"))))
+			invoke(sendMessage, ui.footer, wmSetText, 0, uintptr(unsafe.Pointer(u16("Η εργασία ολοκληρώθηκε • Δείτε την αναφορά και προχωρήστε μόνο όταν είστε έτοιμοι"))))
+			showStage(ui.stage + " — ολοκληρώθηκε")
 			if ui.cancel != nil {
 				ui.cancel()
 				ui.cancel = nil
@@ -339,17 +346,20 @@ func layout(hwnd uintptr) {
 	invoke(moveWindow, ui.header, 80, 18, uintptr(w-95), 42, 1)
 	invoke(moveWindow, ui.subhead, 81, 61, uintptr(w-100), 25, 1)
 	invoke(moveWindow, ui.projectTitle, 26, 121, 270, 26, 1)
-	invoke(moveWindow, ui.actionTitle, uintptr(mainX), 121, uintptr(contentW), 27, 1)
+	invoke(moveWindow, ui.actionTitle, uintptr(mainX), 115, uintptr(contentW), 25, 1)
+	invoke(moveWindow, ui.stageStatus, uintptr(mainX), 145, uintptr(contentW), 22, 1)
 	invoke(moveWindow, ui.buttons[101], 24, 154, 278, 58, 1)
 	invoke(moveWindow, ui.list, 24, 226, 278, uintptr(h-425), 1)
 	invoke(moveWindow, ui.buttons[113], 24, uintptr(h-177), 278, 47, 1)
 	invoke(moveWindow, ui.buttons[114], 24, uintptr(h-121), 278, 40, 1)
-	invoke(moveWindow, ui.buttons[103], uintptr(mainX), 156, uintptr(contentW), 77, 1)
-	invoke(moveWindow, ui.buttons[104], uintptr(mainX), 249, uintptr(half), 55, 1)
-	invoke(moveWindow, ui.buttons[105], uintptr(mainX+half+12), 249, uintptr(half), 55, 1)
-	invoke(moveWindow, ui.buttons[111], uintptr(mainX), 314, uintptr(contentW), 38, 1)
-	invoke(moveWindow, ui.resultsTitle, uintptr(mainX), 374, uintptr(contentW), 27, 1)
-	invoke(moveWindow, ui.output, uintptr(mainX+12), 414, uintptr(contentW-24), uintptr(h-492), 1)
+	invoke(moveWindow, ui.buttons[103], uintptr(mainX), 175, uintptr(contentW), 66, 1)
+    invoke(moveWindow, ui.buttons[104], uintptr(mainX), 253, uintptr(half), 46, 1)
+    invoke(moveWindow, ui.buttons[105], uintptr(mainX+half+12), 253, uintptr(half), 46, 1)
+    invoke(moveWindow, ui.buttons[115], uintptr(mainX), 311, uintptr(half), 56, 1)
+    invoke(moveWindow, ui.buttons[116], uintptr(mainX+half+12), 311, uintptr(half), 56, 1)
+    invoke(moveWindow, ui.buttons[111], uintptr(mainX), 378, uintptr(contentW), 36, 1)
+    invoke(moveWindow, ui.resultsTitle, uintptr(mainX), 432, uintptr(contentW), 27, 1)
+    invoke(moveWindow, ui.output, uintptr(mainX+12), 469, uintptr(contentW-24), uintptr(h-543), 1)
 	invoke(moveWindow, ui.footer, 24, uintptr(h-38), uintptr(w-48), 25, 1)
 	invoke(user32.NewProc("InvalidateRect"), hwnd, 0, 1)
 }
