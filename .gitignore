@@ -1,0 +1,7 @@
+build/
+installer/assets/*.exe
+*.exe
+*.log
+*.test
+*.tmp
+.DS_Store
