@@ -63,6 +63,7 @@ jobs:
             build/windows-unit.log
             build/windows-python-end-to-end.log
             build/windows-ui-smoke.log
+            build/windows-gui-render.png
           if-no-files-found: warn
       - name: Publish EXE and Setup only if every required check passed
         if: success()
