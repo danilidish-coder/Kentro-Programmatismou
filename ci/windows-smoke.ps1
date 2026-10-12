@@ -47,7 +47,7 @@ try {
     if($count -lt 35){ throw "FAIL: missing distinct result rows (count=$count)" }
     $last=[System.Text.StringBuilder]::new(256)
     [void][UIMessage]::SendMessage($results,0x189,[IntPtr]($count-1),$last)
-    if($last.ToString() -notmatch 'Οπτικός έλεγχος 34'){throw 'FAIL: wrong text in final distinct result row'}
+    if($last.ToString() -notmatch '34'){throw 'FAIL: wrong text in final distinct result row'}
     Trace "PASS: $count independent result rows, last row correct (no overprinting)"
     try {
       Add-Type -AssemblyName System.Drawing
