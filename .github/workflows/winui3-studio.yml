@@ -48,6 +48,9 @@ jobs:
           if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
           if(-not (Test-Path publish/Kentro_Programmatismou.exe)) { throw 'New native EXE missing' }
           if(-not (Test-Path publish/Kentro_Engine.exe)) { throw 'Backend adapter missing' }
+      - name: Verify all independent engine modules and full end-to-end workflow
+        run: |
+          ./ci/studio-module-tests.ps1
       - name: Launch modern UI on a real Windows runner
         run: |
           ./ci/studio-smoke.ps1
@@ -80,6 +83,7 @@ jobs:
             studio-screenshot.png
             studio-onefile-build.log
             studio-onefile-smoke.log
+            studio-modules.log
           if-no-files-found: warn
       - name: Publish single verified Windows EXE
         if: success()
