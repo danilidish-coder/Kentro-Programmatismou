@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -286,6 +287,19 @@ func missingBuildRequirement(ctx context.Context, work string, step Step) string
 
 // GUI smoke test: a desktop program must stay open briefly. A controlled kill
 // after the interval is PASS; unexpected early termination is FAIL.
+// PyInstaller one-file EXEs spawn children: kill the entire Windows process tree.
+func terminateProcessTree(cmd *exec.Cmd) {
+    if cmd == nil || cmd.Process == nil {
+        return
+    }
+    if runtime.GOOS == "windows" {
+        ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+        defer cancel()
+        _ = exec.CommandContext(ctx, "taskkill.exe", "/F", "/T", "/PID", strconv.Itoa(cmd.Process.Pid)).Run()
+    }
+    _ = cmd.Process.Kill()
+}
+
 func runGUISmoke(ctx context.Context, work string, step Step) Result {
 	r := Result{Name: step.Name, Phase: "SMOKE", Required: step.Mandatory(), ExitCode: -1}
 	exe, args, err := resolve(work, step.Command, step.Args)
@@ -315,18 +329,21 @@ func runGUISmoke(ctx context.Context, work string, step Step) Result {
 			r.Reason += ": " + redact(err.Error())
 		}
 	case <-timer.C:
-		_ = cmd.Process.Kill()
+		terminateProcessTree(cmd)
 		<-done
 		r.Status = "PASS"
 		r.ExitCode = 0
 		r.Reason = "Η εφαρμογή παρέμεινε σε λειτουργία για τουλάχιστον 4 δευτερόλεπτα"
 	case <-ctx.Done():
-		_ = cmd.Process.Kill()
+		terminateProcessTree(cmd)
 		<-done
 		r.Status = "CANCELLED"
 		r.Reason = "Ακυρώθηκε ο έλεγχος εκκίνησης"
 	}
-	r.DurationMS = time.Since(start).Milliseconds()
+	if runtime.GOOS == "windows" {
+        time.Sleep(350 * time.Millisecond)
+    }
+    r.DurationMS = time.Since(start).Milliseconds()
 	return r
 }
 
