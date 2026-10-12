@@ -65,12 +65,13 @@ internal sealed partial class StudioWindow
         sidebar.Children.Add(sideActions);
         content.Children.Add(Card(sidebar, new Thickness(15)));
 
+        var heightConstrained = AppWindow.Size.Height < 760;
         var right = new Grid { RowSpacing = 13 };
         right.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         right.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        right.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        Grid.SetColumn(right, 1);
-        content.Children.Add(right);
+        right.RowDefinitions.Add(new RowDefinition {
+            Height = heightConstrained ? GridLength.Auto : new GridLength(1, GridUnitType.Star)
+        });
 
         var hero = new Grid { RowSpacing = 7 };
         hero.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -86,6 +87,7 @@ internal sealed partial class StudioWindow
         right.Children.Add(heroCard);
 
         var compact = AppWindow.Size.Width < 810;
+        var narrowTitles = AppWindow.Size.Width < 1080;
         var phases = new Grid { ColumnSpacing = 12, RowSpacing = 10 };
         for (var i = 0; i < (compact ? 2 : 4); i++)
             phases.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -99,7 +101,7 @@ internal sealed partial class StudioWindow
             Phase("01", "ΕΛΕΓΧΟΙ", "Έλεγχοι και δοκιμές πίεσης", testButton),
             Phase("02", "ΑΝΑΦΟΡΑ", "Αναλυτικά αποτελέσματα", reportButton),
             Phase("03", "ΚΑΤΑΣΚΕΥΗ EXE", "Μόνο μετά τους ελέγχους", buildButton),
-            Phase("04", "ΕΓΚΑΤΑΣΤΑΣΗ", "Προαιρετικό Setup", setupButton)
+            Phase("04", narrowTitles ? "SETUP" : "ΕΓΚΑΤΑΣΤΑΣΗ", "Προαιρετικό Setup", setupButton)
         };
         for (var i = 0; i < phaseCards.Length; i++)
         {
@@ -126,6 +128,7 @@ internal sealed partial class StudioWindow
         results.Background = FieldBackground;
         results.Foreground = Ink;
         results.CornerRadius = new CornerRadius(8);
+        if (heightConstrained) results.MinHeight = 210;
         Grid.SetRow(results, 3);
         activity.Children.Add(results);
         var bottom = Columns(0, 0);
@@ -139,6 +142,24 @@ internal sealed partial class StudioWindow
         var activityCard = Card(activity, new Thickness(17, 15, 17, 15));
         Grid.SetRow(activityCard, 2);
         right.Children.Add(activityCard);
+
+        if (heightConstrained)
+        {
+            // On 1024x768 and smaller, stage controls and results stay reachable by scrolling.
+            var view = new ScrollViewer
+            {
+                Content = right,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+            };
+            Grid.SetColumn(view, 1);
+            content.Children.Add(view);
+        }
+        else
+        {
+            Grid.SetColumn(right, 1);
+            content.Children.Add(right);
+        }
 
         var footer = new Grid { Margin = new Thickness(18, 4, 18, 3) };
         footer.Children.Add(status);
