@@ -66,5 +66,8 @@ internal sealed partial class StudioWindow : Window
         stopButton.Click += (_, _) => work?.Cancel();
         SetButtons();
         _ = RefreshProjectsAsync();
+        var integrationZip = Environment.GetEnvironmentVariable("KENTRO_STUDIO_INTEGRATION_ZIP");
+        if (!string.IsNullOrWhiteSpace(integrationZip))
+            _ = RunCiIntegrationAsync(integrationZip);
     }
 }
