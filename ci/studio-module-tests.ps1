@@ -19,7 +19,7 @@ function Bridge([string]$action, [string]$argument = '', [bool]$shouldFail = $fa
     Assert ($code -ne 0 -and $last.type -eq 'error') "Expected guarded failure for $action"
     return $null
   }
-  if($code -ne 0 -or $last.type -ne 'result') { throw "BRIDGE $action error code=$code: $($last.message)" }
+  if($code -ne 0 -or $last.type -ne 'result') { throw "BRIDGE $action error code=${code}: $($last.message)" }
   return $last.payload
 }
 function WriteUtf8([string]$file,[string]$text) {
