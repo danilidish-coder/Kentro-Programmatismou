@@ -3,67 +3,54 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
-using Windows.Storage.Pickers;
-using WinRT.Interop;
-using System.Diagnostics;
 using System.Numerics;
-using System.Text.Json;
 
 namespace KentroStudio;
 
 internal sealed partial class StudioWindow
 {
+    // Layout is independent of execution, project state and the bridge.
+    // Large Greek labels and navy cards follow the working Control Center reference.
     private UIElement BuildLayout()
     {
-        var root = new Grid { Background = Background };
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(78) });
+        var root = new Grid { Background = Background, RequestedTheme = ElementTheme.Dark };
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(116) });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(28) });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(31) });
 
-        var header = new Grid {
-            Background = White, Padding = new Thickness(22, 10, 22, 10)
+        var header = new Border
+        {
+            Background = HeaderGradient,
+            BorderBrush = CardOutline,
+            BorderThickness = new Thickness(0, 0, 0, 2),
+            Padding = new Thickness(23, 13, 23, 13),
+            Child = CreateHeader()
         };
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        var mark = new Border {
-            Background = Blue, Width = 48, Height = 48, CornerRadius = new CornerRadius(14),
-            Child = new TextBlock {
-                Text = "KP", Foreground = White, FontSize = 19,
-                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            },
-            Shadow = new ThemeShadow(), Translation = new Vector3(0, 0, 18)
-        };
-        header.Children.Add(mark);
-        var brand = new StackPanel { Margin = new Thickness(16, 1, 0, 0), Spacing = 2 };
-        brand.Children.Add(Label("ΚΕΝΤΡΟ ΠΡΟΓΡΑΜΜΑΤΙΣΜΟΥ", 18, true));
-        brand.Children.Add(Label("Προγράμματα · Έλεγχοι · Κατασκευή · Εκδόσεις", 13));
-        Grid.SetColumn(brand, 1);
-        header.Children.Add(brand);
         root.Children.Add(header);
 
-        var content = Columns(278, 0);
-        content.ColumnSpacing = 14;
-        content.Margin = new Thickness(16, 15, 16, 10);
+        var content = Columns(295, 0);
+        content.ColumnSpacing = 13;
+        content.Margin = new Thickness(13, 12, 13, 9);
         Grid.SetRow(content, 1);
         root.Children.Add(content);
 
-        var sidebar = new Grid();
-        sidebar.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var sidebar = new Grid { RowSpacing = 11 };
         sidebar.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         sidebar.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         sidebar.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        sidebar.RowSpacing = 9;
-        sidebar.Children.Add(Label("ΤΑ ΠΡΟΓΡΑΜΜΑΤΑ ΜΟΥ", 16, true));
-        Grid.SetRow(counter, 1);
-        sidebar.Children.Add(counter);
-        projects.BorderThickness = new Thickness(0);
-        projects.Background = Color(248, 250, 255);
-        projects.CornerRadius = new CornerRadius(14);
-        Grid.SetRow(projects, 2);
+        var sideTitle = new StackPanel { Spacing = 4 };
+        sideTitle.Children.Add(Label("ΤΑ ΠΡΟΓΡΑΜΜΑΤΑ ΜΟΥ", 19, true));
+        sideTitle.Children.Add(counter);
+        sidebar.Children.Add(sideTitle);
+        projects.BorderThickness = new Thickness(1);
+        projects.BorderBrush = CardOutline;
+        projects.Background = FieldBackground;
+        projects.Foreground = Ink;
+        projects.CornerRadius = new CornerRadius(8);
+        Grid.SetRow(projects, 1);
         sidebar.Children.Add(projects);
-        var sideActions = new StackPanel { Spacing = 9 };
+
+        var sideActions = new StackPanel { Spacing = 10 };
         var import = ActionButton("＋  ΕΙΣΑΓΩΓΗ ΠΡΟΓΡΑΜΜΑΤΟΣ ZIP", true);
         import.Click += async (_, _) => await ImportAsync();
         sideActions.Children.Add(import);
@@ -74,56 +61,71 @@ internal sealed partial class StudioWindow
         restore.Click += async (_, _) => await RestoreAsync();
         sideActions.Children.Add(restore);
         sideActions.Children.Add(trashButton);
-        Grid.SetRow(sideActions, 3);
+        Grid.SetRow(sideActions, 2);
         sidebar.Children.Add(sideActions);
-        content.Children.Add(Card(sidebar, new Thickness(16)));
+        content.Children.Add(Card(sidebar, new Thickness(15)));
 
-        var right = new Grid();
+        var right = new Grid { RowSpacing = 13 };
         right.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         right.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         right.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        right.RowSpacing = 11;
         Grid.SetColumn(right, 1);
         content.Children.Add(right);
 
-        var hero = new Grid();
+        var hero = new Grid { RowSpacing = 7 };
         hero.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         hero.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         hero.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        hero.RowSpacing = 4;
-        hero.Children.Add(Label("ΕΠΙΛΕΓΜΕΝΟ ΠΡΟΓΡΑΜΜΑ", 12, true));
+        hero.Children.Add(Label("ΕΠΙΛΕΓΜΕΝΟ ΠΡΟΓΡΑΜΜΑ", 14, true));
         Grid.SetRow(projectName, 1);
         hero.Children.Add(projectName);
         Grid.SetRow(projectInfo, 2);
         hero.Children.Add(projectInfo);
-        var heroCard = Card(hero, new Thickness(18, 12, 18, 12));
+        var heroCard = Card(hero, new Thickness(20, 13, 20, 15));
         Grid.SetRow(heroCard, 0);
         right.Children.Add(heroCard);
 
-        var phases = new Grid { ColumnSpacing = 8 };
-        for (int i = 0; i < 4; i++) phases.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        phases.Children.Add(Phase("01", "ΕΛΕΓΧΟΙ", "Αυτόματοι έλεγχοι και πίεση", testButton, 0));
-        phases.Children.Add(Phase("02", "ΑΝΑΦΟΡΑ", "Προβολή αποτελεσμάτων", reportButton, 1));
-        phases.Children.Add(Phase("03", "ΠΡΟΓΡΑΜΜΑ EXE", "Μετά από επιτυχείς ελέγχους", buildButton, 2));
-        phases.Children.Add(Phase("04", "ΕΓΚΑΤΑΣΤΑΣΗ", "Προαιρετικό Setup", setupButton, 3));
+        var compact = AppWindow.Size.Width < 1250;
+        var phases = new Grid { ColumnSpacing = 12, RowSpacing = 10 };
+        for (var i = 0; i < (compact ? 2 : 4); i++)
+            phases.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        if (compact)
+        {
+            phases.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            phases.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        }
+        var phaseCards = new[]
+        {
+            Phase("01", "ΕΛΕΓΧΟΙ", "Έλεγχοι και δοκιμές πίεσης", testButton),
+            Phase("02", "ΑΝΑΦΟΡΑ", "Αναλυτικά αποτελέσματα", reportButton),
+            Phase("03", "ΚΑΤΑΣΚΕΥΗ EXE", "Μόνο μετά τους ελέγχους", buildButton),
+            Phase("04", "ΕΓΚΑΤΑΣΤΑΣΗ", "Προαιρετικό Setup", setupButton)
+        };
+        for (var i = 0; i < phaseCards.Length; i++)
+        {
+            Grid.SetColumn(phaseCards[i], compact ? i % 2 : i);
+            if (compact) Grid.SetRow(phaseCards[i], i / 2);
+            phases.Children.Add(phaseCards[i]);
+        }
         Grid.SetRow(phases, 1);
         right.Children.Add(phases);
 
-        var activity = new Grid();
+        var activity = new Grid { RowSpacing = 10 };
         activity.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         activity.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         activity.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         activity.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         activity.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        activity.RowSpacing = 6;
         activity.Children.Add(logHeading);
         Grid.SetRow(stageText, 1);
         activity.Children.Add(stageText);
         Grid.SetRow(progress, 2);
         activity.Children.Add(progress);
-        results.BorderThickness = new Thickness(0);
-        results.Background = Color(248, 250, 254);
-        results.CornerRadius = new CornerRadius(13);
+        results.BorderThickness = new Thickness(1);
+        results.BorderBrush = CardOutline;
+        results.Background = FieldBackground;
+        results.Foreground = Ink;
+        results.CornerRadius = new CornerRadius(8);
         Grid.SetRow(results, 3);
         activity.Children.Add(results);
         var bottom = Columns(0, 0);
@@ -134,29 +136,65 @@ internal sealed partial class StudioWindow
         bottom.Children.Add(stopButton);
         Grid.SetRow(bottom, 4);
         activity.Children.Add(bottom);
-        var activityCard = Card(activity, new Thickness(16, 13, 16, 13));
+        var activityCard = Card(activity, new Thickness(17, 15, 17, 15));
         Grid.SetRow(activityCard, 2);
         right.Children.Add(activityCard);
 
-        var footer = new Grid { Margin = new Thickness(25, 4, 25, 4) };
+        var footer = new Grid { Margin = new Thickness(18, 4, 18, 3) };
         footer.Children.Add(status);
         Grid.SetRow(footer, 2);
         root.Children.Add(footer);
         return root;
     }
-    private static Border Phase(string number, string title, string subtitle, Button action, int column)
+
+    private static Grid CreateHeader()
     {
-        var stack = new StackPanel { Spacing = 5 };
-        stack.Children.Add(new TextBlock { Text = number, Foreground = Blue, FontSize = 17,
-            FontWeight = Microsoft.UI.Text.FontWeights.Bold });
-        stack.Children.Add(Label(title, 12, true));
-        var note = Label(subtitle, 10.5);
-        note.MinHeight = 31;
+        var header = Columns(75, 0);
+        var mark = new Border
+        {
+            Width = 66, Height = 66,
+            Background = ActiveGradient,
+            BorderBrush = Blue,
+            BorderThickness = new Thickness(2),
+            CornerRadius = new CornerRadius(13),
+            Shadow = new ThemeShadow(),
+            Translation = new Vector3(0, 0, 22),
+            Child = new TextBlock
+            {
+                Text = "ΚΠ", Foreground = Ink, FontSize = 27,
+                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            }
+        };
+        header.Children.Add(mark);
+        var words = new StackPanel
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            Spacing = 4,
+            Margin = new Thickness(12, 0, 0, 0)
+        };
+        words.Children.Add(Label("ΚΕΝΤΡΟ ΠΡΟΓΡΑΜΜΑΤΙΣΜΟΥ", 27, true));
+        words.Children.Add(Label("ΤΟΠΙΚΗ ΑΝΑΠΤΥΞΗ ΠΡΟΓΡΑΜΜΑΤΩΝ   •   ΕΛΕΓΧΟΙ   •   EXE   •   ΕΚΔΟΣΕΙΣ", 13, true));
+        Grid.SetColumn(words, 1);
+        header.Children.Add(words);
+        return header;
+    }
+
+    private static Border Phase(string number, string title, string subtitle, Button action)
+    {
+        var stack = new StackPanel { Spacing = 6 };
+        stack.Children.Add(new TextBlock
+        {
+            Text = number, Foreground = Blue, FontSize = 19,
+            FontWeight = Microsoft.UI.Text.FontWeights.Bold
+        });
+        stack.Children.Add(Label(title, 16, true));
+        var note = Label(subtitle, 12);
+        note.MinHeight = 34;
         stack.Children.Add(note);
-        action.Height = 38;
+        action.Height = 48;
         stack.Children.Add(action);
-        var card = Card(stack, new Thickness(10, 11, 10, 10));
-        Grid.SetColumn(card, column);
-        return card;
+        return Card(stack, new Thickness(14, 12, 14, 13));
     }
 }
