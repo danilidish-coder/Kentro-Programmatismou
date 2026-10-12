@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
+	"os/exec"
+	"runtime"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -160,7 +162,7 @@ func TestNoTestsNotApproved(t *testing.T) {
 	}
 }
 func TestOfflineGoTests(t *testing.T) {
-	if _, e := os.Stat("/usr/local/go/bin/go"); e != nil {
+	if _, e := exec.LookPath("go"); e != nil {
 		t.Skip("No local Go compiler")
 	}
 	s := newTestStore(t)
@@ -185,8 +187,11 @@ func TestOfflineGoTests(t *testing.T) {
 	if pass < 3 {
 		t.Fatalf("Expected test, stress, integrity PASS: %+v", run.Results)
 	}
-	if !run.Blocked {
+	if runtime.GOOS != "windows" && !run.Blocked {
 		t.Fatal("Non-Windows build approved")
+	}
+	if runtime.GOOS == "windows" && run.Blocked {
+		t.Fatalf("Windows run unexpectedly blocked: %+v", run.Results)
 	}
 	root, _ := s.Base(p.ID)
 	if e = os.WriteFile(filepath.Join(root, "source", "main.go"), []byte("package main\nfunc main(){println(1)}\n"), 0600); e != nil {
@@ -222,8 +227,11 @@ func TestExampleFullPipeline(t *testing.T) {
 	if seen["TEST"] != "PASS" || seen["STRESS"] != "PASS" || seen["INTEGRITY"] != "PASS" {
 		t.Fatalf("Functional/stress test failed: %+v", r.Results)
 	}
-	if !r.Blocked {
-		t.Fatal("Linux run cannot approve Windows exe")
+	if runtime.GOOS != "windows" && !r.Blocked {
+		t.Fatal("Non-Windows run cannot approve Windows exe")
+	}
+	if runtime.GOOS == "windows" && r.Blocked {
+		t.Fatalf("Windows pipeline unexpectedly blocked: %+v", r.Results)
 	}
 	out, e := s.ExportLatest(p.ID)
 	if e != nil {
