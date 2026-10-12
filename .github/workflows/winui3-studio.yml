@@ -1,0 +1,73 @@
+name: WinUI 3 modern studio validation
+
+on:
+  push:
+    branches: [feature/winui3-modern-studio]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Native Windows x64 build and GUI smoke
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: source/go.mod
+          cache-dependency-path: source/go.mod
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Validate existing engine and local CLI adapter
+        run: |
+          Push-Location source
+          go test -count=1 ./... 2>&1 | Tee-Object ../engine-test.log
+          if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
+          go vet ./...
+          if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
+          New-Item -ItemType Directory -Force -Path ../publish | Out-Null
+          go build -trimpath -o ../publish/Kentro_Engine.exe ./cmd/bridge
+          if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
+          Pop-Location
+          $reply = & ./publish/Kentro_Engine.exe version | ConvertFrom-Json
+          if($LASTEXITCODE -ne 0 -or $reply.type -ne 'result') { throw 'CLI bridge version smoke failed' }
+          $list = & ./publish/Kentro_Engine.exe list | ConvertFrom-Json
+          if($LASTEXITCODE -ne 0 -or $list.type -ne 'result') { throw 'CLI bridge list smoke failed' }
+      - name: Publish native unpackaged self-contained WinUI 3 application
+        run: |
+          dotnet publish studio/Kentro.Studio.csproj --configuration Release --runtime win-x64 --self-contained true -p:Platform=x64 --output publish 2>&1 | Tee-Object studio-build.log
+          if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
+          if(-not (Test-Path publish/Kentro_Programmatismou.exe)) { throw 'New native EXE missing' }
+          if(-not (Test-Path publish/Kentro_Engine.exe)) { throw 'Backend adapter missing' }
+      - name: Launch modern UI on a real Windows runner
+        run: |
+          ./ci/studio-smoke.ps1
+      - name: Store logs and screenshot even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-diagnostics
+          path: |
+            engine-test.log
+            studio-build.log
+            studio-smoke.log
+            studio-screenshot.png
+          if-no-files-found: warn
+      - name: Publish working self-contained Windows folder only on full success
+        if: success()
+        run: |
+          Compress-Archive -Path publish/* -DestinationPath Kentro_Programmatismou_Modern_Studio.zip -CompressionLevel Optimal
+      - if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kentro_Programmatismou_Modern_Studio
+          path: Kentro_Programmatismou_Modern_Studio.zip
+          if-no-files-found: error
