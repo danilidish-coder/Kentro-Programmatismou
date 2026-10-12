@@ -320,10 +320,10 @@ func (s *Store) RestoreLastRemoved() (Project, error) {
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(names)))
 	for _, name := range names {
-		if len(name) < 31 || name[24] != '-' {
+		if len(name) < 34 || name[25] != '-' {
 			continue
 		}
-		id := name[25:]
+		id := name[26:]
 		if !validID(id) {
 			continue
 		}
