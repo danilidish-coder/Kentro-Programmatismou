@@ -59,6 +59,7 @@ func main() {}
 '@
   $zip = Join-Path $root 'input.zip'
   Compress-Archive -Path (Join-Path $src '*') -DestinationPath $zip
+  [System.IO.File]::WriteAllText((Join-Path (Get-Location) 'studio-module-fixture-location.txt'), $zip, [System.Text.UTF8Encoding]::new($false))
   $initial = @(Bridge 'list')
   Assert ($initial.Count -eq 0) 'Initial isolated project list must be empty'
   Log 'PASS: local isolation and empty list'
