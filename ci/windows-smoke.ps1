@@ -14,6 +14,7 @@ public static class UIMessage {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
   [DllImport("user32.dll")] public static extern int GetDlgCtrlID(IntPtr hwnd);
   [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr parent, int id);
+  [DllImport("user32.dll")] public static extern int GetSystemMetrics(int id);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr hwnd, uint message, IntPtr wp, System.Text.StringBuilder lp);
   [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hwnd, uint message, IntPtr wp, IntPtr lp);
   [StructLayout(LayoutKind.Sequential)] public struct Rect { public int L,T,R,B; }
@@ -33,6 +34,15 @@ try {
     }
     if ($hwnd -eq [IntPtr]::Zero) { throw 'NOT RUN: Windows runner does not expose a usable desktop session' }
     Trace "PASS: visible native main window: $hwnd"
+    $mainRect=[UIMessage+Rect]::new()
+    if(-not [UIMessage]::GetWindowRect($hwnd,[ref]$mainRect)){throw 'FAIL: cannot read app window size'}
+    $desktopWidth=[UIMessage]::GetSystemMetrics(0)
+    $desktopHeight=[UIMessage]::GetSystemMetrics(1)
+    if($mainRect.L -lt 0 -or $mainRect.T -lt 0 -or $mainRect.R -gt $desktopWidth -or $mainRect.B -gt $desktopHeight){
+        throw "FAIL: app exceeds screen ($($mainRect.L),$($mainRect.T),$($mainRect.R),$($mainRect.B)) vs $desktopWidth x $desktopHeight"
+    }
+    Trace "PASS: application fits in screen $desktopWidth x $desktopHeight"
+
     [UIMessage]::PostMessage($hwnd, 0x8009, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
     Start-Sleep -Milliseconds 1300
     $results=[IntPtr]::Zero
