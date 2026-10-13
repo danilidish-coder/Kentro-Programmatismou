@@ -3,7 +3,6 @@ package engine
 import (
 	"bytes"
 	"context"
-	"errors"
 	"encoding/json"
 	"errors"
 	"fmt"

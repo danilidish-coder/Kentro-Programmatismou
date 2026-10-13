@@ -72,6 +72,7 @@ type Result struct {
 	ExitCode   int    `json:"exit_code"`
 	DurationMS int64  `json:"duration_ms"`
 	LogFile    string `json:"log_file,omitempty"`
+	FailureKind string `json:"failure_kind,omitempty"`
 }
 
 type Artifact struct {
