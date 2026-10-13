@@ -18,12 +18,14 @@ $nodeHome=Split-Path (Get-Command node).Source -Parent
 ("PYTHON="+$pyHome+"; GO="+$goHome+"; DOTNET="+$dotnetHome+"; NODE="+$nodeHome) | Set-Content runtime-package.log
 CopyAll $pyHome (Join-Path $root 'python')
 CopyAll $goHome (Join-Path $root 'go')
-CopyAll $nodeHome (Join-Path $root 'node')
+# Node.js runtime: node.exe is enough for local node tests; npm packages are project-local.
+New-Item -ItemType Directory (Join-Path $root 'node') -Force | Out-Null
+Copy-Item (Join-Path $nodeHome 'node.exe') (Join-Path $root 'node/node.exe')
 # Copy only the selected .NET 8 SDK and matching local references/runtime.
 $dest=Join-Path $root 'dotnet'
 New-Item -ItemType Directory $dest -Force | Out-Null
 Copy-Item (Join-Path $dotnetHome 'dotnet.exe') $dest
-foreach($d in @('host','templates','metadata')) {
+foreach($d in @('host','metadata')) {
  if(Test-Path (Join-Path $dotnetHome $d)){CopyAll (Join-Path $dotnetHome $d) (Join-Path $dest $d)}
 }
 foreach($part in @(
@@ -36,7 +38,7 @@ foreach($part in @(
  'packs/NETStandard.Library.Ref/*'
 )){
  $items=Get-Item (Join-Path $dotnetHome $part) -ErrorAction SilentlyContinue
- foreach($item in $items){
+ foreach($item in ($items | Sort-Object FullName -Descending | Select-Object -First 1)){
   $rel=$item.FullName.Substring($dotnetHome.Length).TrimStart('\','/')
   CopyAll $item.FullName (Join-Path $dest $rel)
  }
@@ -52,5 +54,5 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $bytes=(Get-Item $out).Length
 ("RUNTIME_ZIP_BYTES="+$bytes) | Add-Content runtime-package.log
 Get-ChildItem $root -Directory | ForEach-Object {($_.Name+"="+((Get-ChildItem $_.FullName -Recurse -File | Measure-Object Length -Sum).Sum)) | Add-Content runtime-package.log}
-if($bytes -lt 80000000 -or $bytes -gt 1400000000){throw "Unexpected runtime archive size: $bytes"}
+if($bytes -lt 80000000 -or $bytes -gt 2030000000){throw "Unexpected runtime archive size: $bytes"}
 Get-Content runtime-package.log

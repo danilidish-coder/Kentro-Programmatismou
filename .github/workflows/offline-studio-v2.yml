@@ -32,15 +32,32 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: FAST Windows WPF compile before multi-gigabyte runtime packaging
+        run: |
+          dotnet build Studio/Studio.csproj -c Release -r win-x64 --self-contained false /p:PublishSingleFile=false /p:EnableCompressionInSingleFile=false 2>&1 | Tee-Object studio-quick-compile.log
+          if($LASTEXITCODE -ne 0){throw 'Early WPF compilation failed — do not package tools'}
       - name: Install pinned Python build and project dependencies INTO bundled interpreter
         run: |
           python -m pip install --no-cache-dir --disable-pip-version-check "PyInstaller==6.16.0" "PySide6==6.9.3" "python-docx==1.2.0" "openpyxl==3.1.5" "Pillow==11.3.0" "pytest==8.4.2" "psutil==7.1.0" "requests==2.32.5"
           if($LASTEXITCODE -ne 0){throw 'Bundled Python libraries unavailable'}
           python -c "import PySide6.QtWidgets,PyInstaller,openpyxl,docx,PIL,pytest;print('ALL_PYTHON_PACKAGES_PRESENT')"
           if($LASTEXITCODE -ne 0){throw 'Missing bundled Python library'}
+      - name: Restore cached portable toolchains (no repeated full download)
+        id: tools-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: Studio/Assets/toolchains.zip
+          key: studio-v2-portable-py312-go125-dotnet8-node22-20261013-b
       - name: Package complete portable toolchains within application (no admin / no internet at user PC)
+        if: steps.tools-cache.outputs.cache-hit != 'true'
         run: |
           ./ci/package-runtime.ps1
+      - name: Save portable toolchains before running tests
+        if: steps.tools-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: Studio/Assets/toolchains.zip
+          key: studio-v2-portable-py312-go125-dotnet8-node22-20261013-b
       - name: Build new WPF desktop application as one self-contained EXE
         run: |
           dotnet publish Studio/Studio.csproj -c Release -r win-x64 --self-contained true --output publish /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true /p:EnableCompressionInSingleFile=true 2>&1 | Tee-Object studio-build.log
@@ -82,6 +99,7 @@ jobs:
         with:
           name: offline-studio-v2-windows-qa
           path: |
+            studio-quick-compile.log
             studio-build.log
             studio-qa-results.log
             studio-qa-failure.log
