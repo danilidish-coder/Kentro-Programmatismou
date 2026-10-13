@@ -227,6 +227,9 @@ public partial class MainWindow : Window
             _busy = false;
             SetButtons();
             await RefreshProjectsAsync();
+            // The results list can request BringIntoView during import. On a new project,
+            // return the main panel to its start so the selected project card is visible.
+            MainScroll.ScrollToTop();
         }
     }
 
