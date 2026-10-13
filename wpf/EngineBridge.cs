@@ -9,7 +9,8 @@ namespace KentroWpf;
 internal static class EngineBridge
 {
     public static async Task<JsonElement> RunAsync(string action, string? value = null,
-        Action<string>? progress = null, CancellationToken cancel = default)
+        Action<string>? progress = null, CancellationToken cancel = default,
+        string? extra = null)
     {
         var executable = Path.Combine(AppContext.BaseDirectory, "Kentro_Engine.exe");
         if (!File.Exists(executable))
@@ -27,6 +28,7 @@ internal static class EngineBridge
         };
         start.ArgumentList.Add(action);
         if (value is not null) start.ArgumentList.Add(value);
+        if (extra is not null) start.ArgumentList.Add(extra);
 
         using var process = new Process { StartInfo = start };
         if (!process.Start()) throw new InvalidOperationException("Δεν ξεκίνησε η μηχανή δοκιμών.");

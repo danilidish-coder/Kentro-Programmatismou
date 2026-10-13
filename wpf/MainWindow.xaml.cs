@@ -67,6 +67,7 @@ public partial class MainWindow : Window
         RestoreButton.IsEnabled = !_busy;
         TrashButton.IsEnabled = selected;
         TestButton.IsEnabled = selected;
+        ReviewImportButton.IsEnabled = selected;
         ReportButton.IsEnabled = false;
         BuildButton.IsEnabled = false;
         SetupButton.IsEnabled = false;
@@ -103,6 +104,7 @@ public partial class MainWindow : Window
                 HistoryList.ItemsSource = null;
                 HistoryDetail.Text = "Επίλεξε ένα έργο για να δεις τις εκτελέσεις.";
                 HistoryStatus.Text = "Δεν υπάρχει επιλεγμένο έργο.";
+                ReviewStatusText.Text = "Πρώτα εισάγετε ένα πρόγραμμα και εκτελέστε ελέγχους.";
                 SetButtons();
             }
             else await RefreshDetailsAsync();
@@ -134,6 +136,10 @@ public partial class MainWindow : Window
             ProjectInfoText.Text = "Έκδοση "+Value(project,"version","—")+" · "+
                 Value(project,"language","Άγνωστο")+" · "+
                 tests+" λειτουργικοί έλεγχοι · "+stress+" δοκιμές πίεσης";
+            var review = details.GetProperty("review_status");
+            var reviewKind = Value(review, "status");
+            ReviewStatusText.Text = Value(review, "message", "Αναμονή ελέγχων");
+            ReviewImportButton.IsEnabled = reviewKind == "WAITING_REVIEW";
             var checks = details.GetProperty("ready_build").GetBoolean();
             var setup = details.GetProperty("ready_setup").GetBoolean();
             TestButton.IsEnabled = true;
@@ -144,7 +150,8 @@ public partial class MainWindow : Window
             var latest = details.GetProperty("latest");
             ReportButton.IsEnabled = latest.ValueKind == JsonValueKind.Object && Value(latest,"id") != "";
             StageText.Text = setup ? "Επιτυχής κατασκευή EXE · Διαθέσιμο Setup" :
-                checks ? "Οι έλεγχοι πέρασαν · Μπορεί να κατασκευαστεί EXE" :
+                checks ? "Εγκρίθηκε η κατασκευή EXE · Μπορεί να ξεκινήσει" :
+                reviewKind == "WAITING_REVIEW" ? "Περιμένουμε το ΟΚ του ChatGPT · Στείλτε την αναφορά" :
                 "Επόμενο βήμα: λειτουργικοί έλεγχοι και stress tests";
             await RefreshHistoryAsync(id);
         }

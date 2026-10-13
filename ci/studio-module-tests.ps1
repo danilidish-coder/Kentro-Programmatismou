@@ -9,8 +9,9 @@ $bridge = (Resolve-Path './publish/Kentro_Engine.exe').Path
 $report = Join-Path (Get-Location) 'studio-modules.log'
 function Log([string]$s) { $s | Tee-Object -FilePath $report -Append }
 function Assert([bool]$condition,[string]$message) { if(-not $condition) { throw "FAILED: $message" } }
-function Bridge([string]$action, [string]$argument = '', [bool]$shouldFail = $false) {
-  if ($argument -ne '') { $raw = & $bridge $action $argument }
+function Bridge([string]$action, [string]$argument = '', [bool]$shouldFail = $false, [string]$extra = '') {
+  if ($argument -ne '' -and $extra -ne '') { $raw = & $bridge $action $argument $extra }
+  elseif ($argument -ne '') { $raw = & $bridge $action $argument }
   else { $raw = & $bridge $action }
   $code = $LASTEXITCODE
   $responses = @($raw | ForEach-Object { $_ | ConvertFrom-Json })
@@ -83,8 +84,31 @@ func main() {}
   Assert (@($checks.results | Where-Object {$_.phase -eq 'TEST' -and $_.status -eq 'PASS'}).Count -ge 1) 'Positive unit tests'
   Assert (@($checks.results | Where-Object {$_.phase -eq 'STRESS' -and $_.status -eq 'PASS'}).Count -ge 1) 'Stress tests'
   $afterChecks = Bridge 'details' $id
-  Assert ($afterChecks.ready_build -and -not $afterChecks.ready_setup) 'Only build becomes available after passed checks'
-  Log 'PASS: tests, stress, integrity, stage persistence, gated build'
+  Assert (-not $afterChecks.ready_build -and -not $afterChecks.ready_setup -and
+          $afterChecks.review_status.status -eq 'WAITING_REVIEW') 'Build must await human review'
+  $null = Bridge 'build' $id $true
+  Log 'PASS: tests pass but EXE remains locked until explicit review'
+
+  # Only a synthetic CI fixture receives a simulated review receipt here.
+  $request = Bridge 'review-request' $id
+  $decision = @{
+    schema = $request.schema
+    decision = 'APPROVED_FOR_BUILD'
+    project_id = $request.project_id
+    run_id = $request.run_id
+    source_sha256 = $request.source_sha256
+    plan_sha256 = $request.plan_sha256
+    results_sha256 = $request.results_sha256
+    reviewer = 'ChatGPT'
+    note = 'CI simulated review of synthetic fixture only'
+  }
+  $reviewFile = Join-Path $root 'ci-review.json'
+  WriteUtf8 $reviewFile ($decision | ConvertTo-Json -Depth 4)
+  $review = Bridge 'review-import' $id $false $reviewFile
+  Assert ($review.status -eq 'APPROVED') 'Synthetic fixture review receipt import failed'
+  $afterReview = Bridge 'details' $id
+  Assert ($afterReview.ready_build -and -not $afterReview.ready_setup) 'Only EXE unlocked after matching manual review'
+  Log 'PASS: external review receipt binds to exact checks, code and plan'
   $built = Bridge 'build' $id
   Assert ($built.approved -eq $true -and -not $built.run.blocked) 'Build approval'
   Assert ($built.run.stage -eq 'BUILD') 'Separated BUILD stage'

@@ -54,6 +54,8 @@ func TestChecksNeverBuildOrCreateExe(t *testing.T){
     if _,e=os.Stat(path);e!=nil{t.Fatal("checks report not saved",e)}
     if runtime.GOOS=="windows" {
         if r.Blocked{t.Fatalf("preflight should pass on real Windows: %+v",r.Results)}
+        if err=s.ReadyForBuild(id);err==nil{t.Fatal("build authorized without explicit ChatGPT review")}
+        approveSyntheticReview(t,s,id)
         if err=s.ReadyForBuild(id);err!=nil{t.Fatal(err)}
         if err=s.ReadyForSetup(id);err==nil{t.Fatal("setup authorized before build")}
     } else if !r.Blocked {t.Fatal("non-Windows report authorized Windows release")}
@@ -64,6 +66,7 @@ func TestBuildGateRejectsChangedSourcesAndPlan(t *testing.T){
     s,id:=stageFixture(t,false)
     r,e:=s.RunChecks(context.Background(),id,nil)
     if e!=nil||r.Blocked{t.Fatalf("preflight %v %+v",e,r.Results)}
+    approveSyntheticReview(t,s,id)
     base,_:=s.Base(id)
     if e=os.WriteFile(filepath.Join(base,"source","main.go"),[]byte("package main\nfunc main(){}\n"),0600);e!=nil{t.Fatal(e)}
     if err:=s.ReadyForBuild(id);err==nil||!strings.Contains(err.Error(),"άλλαξε"){t.Fatalf("changed source accepted: %v",err)}
@@ -79,6 +82,8 @@ func TestEndToEndStagesAreSeparateOnWindows(t *testing.T) {
     if _,e:=s.BuildSetup(context.Background(),id,nil);e==nil{t.Fatal("setup skipped EXE gate")}
     checks,e:=s.RunChecks(context.Background(),id,nil)
     if e!=nil||checks.Blocked{t.Fatalf("checks failed: %v %+v",e,checks.Results)}
+    if _,e=s.BuildChecked(context.Background(),id,nil);e==nil{t.Fatal("build ignored reviewer checkpoint")}
+    approveSyntheticReview(t,s,id)
     if _,e=s.BuildSetup(context.Background(),id,nil);e==nil{t.Fatal("setup skipped completed EXE gate")}
     built,e:=s.BuildChecked(context.Background(),id,nil)
     if e!=nil||built.Blocked{t.Fatalf("build/smoke failed %v %+v",e,built.Results)}

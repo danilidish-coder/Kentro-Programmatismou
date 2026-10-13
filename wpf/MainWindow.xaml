@@ -207,6 +207,24 @@
        </StackPanel>
       </Border>
      </primitives:UniformGrid>
+     <Border Style="{StaticResource Panel}" Margin="0,0,0,12" Padding="12">
+      <Grid>
+       <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="220"/>
+       </Grid.ColumnDefinitions>
+       <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+        <TextBlock Text="ΕΓΚΡΙΣΗ ΠΡΙΝ ΑΠΟ ΤΗΝ ΚΑΤΑΣΚΕΥΗ EXE"
+         Style="{StaticResource Headline}" FontSize="14"/>
+        <TextBlock Name="ReviewStatusText" Text="Πρώτα εκτέλεσε τους ελέγχους."
+         Style="{StaticResource Info}" FontSize="12.5" Margin="0,4,0,0"/>
+       </StackPanel>
+       <Button Name="ReviewImportButton" Grid.Column="1"
+        Content="ΦΟΡΤΩΣΗ ΕΓΚΡΙΣΗΣ"
+        Style="{StaticResource UiButton}"
+        Click="ReviewImport_Click" Height="48"/>
+      </Grid>
+     </Border>
      <!-- GitHub-style pipeline plan and run history, local-only. -->
      <Expander Name="PlanExpander" Header="ΠΛΑΝΟ ΕΛΕΓΧΩΝ — ΤΙ ΘΑ ΕΚΤΕΛΕΣΤΕΙ"
       Background="#0B263E" Foreground="#F1FAFF" BorderBrush="#387BA3"

@@ -65,6 +65,9 @@ func (s *Store) Approve(id string) (string, error) {
     if run.Stage==StageChecks || run.Stage==StageSetup {
         return "",errors.New("Δεν εγκρίνεται έκδοση χωρίς πραγματική κατασκευή και έλεγχο EXE")
     }
+    if run.Stage==StageBuild {
+        if err:=s.ReadyForBuild(id);err!=nil{return "",err}
+    }
     if run.PlanHash=="" || run.PlanHash!=planDigest(manifest) {
         return "",errors.New("Το σχέδιο ελέγχων άλλαξε — απαιτούνται νέοι έλεγχοι")
     }
@@ -236,6 +239,16 @@ func (s *Store) ExportLatest(id string) (string, error) {
 	}
 	env, _ := json.MarshalIndent(map[string]any{"host_os": r.HostOS, "app_version": ProductVersion, "run_id": r.ID, "source_sha256": r.SourceHash}, "", "  ")
 	entries["environment.json"] = env
+    // A passed CHECKS report carries only fingerprints, never a prefilled approval.
+    // ChatGPT examines the entire report and issues a separate matching decision.
+    if r.Stage==StageChecks && !r.Blocked {
+        request, e:=s.ReviewRequest(id)
+        if e==nil {
+            raw, marshalErr:=json.MarshalIndent(request, "", "  ")
+            if marshalErr!=nil {return "",marshalErr}
+            entries["review_request.json"]=append(raw,'\n')
+        }
+    }
 	artifacts, _ := json.MarshalIndent(r.Artifacts, "", "  ")
 	entries["artifacts/manifest.json"] = artifacts
 	var junit strings.Builder

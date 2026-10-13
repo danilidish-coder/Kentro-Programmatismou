@@ -60,11 +60,41 @@ public partial class MainWindow
 
             await ExecuteAsync("checks","CI checks and stress");
             var checkedDetails = await EngineBridge.RunAsync("details",id);
-            Require(checkedDetails.GetProperty("ready_build").GetBoolean() &&
+            Require(!checkedDetails.GetProperty("ready_build").GetBoolean() &&
                     !checkedDetails.GetProperty("ready_setup").GetBoolean() &&
-                    BuildButton.IsEnabled && !SetupButton.IsEnabled,
-                "Build must unlock only after passing test/stress");
-            Mark("UI-driven tests and stress unlock EXE");
+                    !BuildButton.IsEnabled && !SetupButton.IsEnabled &&
+                    ReviewImportButton.IsEnabled,
+                "Build must stay locked after tests until external review");
+            Mark("successful checks do not bypass human review");
+
+            // CI simulates a human review only on the isolated synthetic fixture.
+            // A real user obtains a review decision only after submitting the report to ChatGPT.
+            var request = await EngineBridge.RunAsync("review-request", id);
+            var reviewPath = Path.Combine(Path.GetTempPath(), "kentro-ci-review-"+ Guid.NewGuid().ToString("N")+".json");
+            try
+            {
+                var ticket = JsonSerializer.Serialize(new {
+                    schema = Value(request, "schema"),
+                    decision = "APPROVED_FOR_BUILD",
+                    project_id = Value(request, "project_id"),
+                    run_id = Value(request, "run_id"),
+                    source_sha256 = Value(request, "source_sha256"),
+                    plan_sha256 = Value(request, "plan_sha256"),
+                    results_sha256 = Value(request, "results_sha256"),
+                    reviewer = "ChatGPT",
+                    note = "CI simulated review of synthetic fixture only"
+                });
+                File.WriteAllText(reviewPath, ticket);
+                Require(await ImportReviewAsync(reviewPath, false),
+                    "WPF review import workflow rejected exact matching receipt");
+            }
+            finally { try { File.Delete(reviewPath); } catch {} }
+            await RefreshDetailsAsync();
+            checkedDetails = await EngineBridge.RunAsync("details", id);
+            Require(checkedDetails.GetProperty("ready_build").GetBoolean() &&
+                    BuildButton.IsEnabled && !ReviewImportButton.IsEnabled,
+                "Build should unlock only after exact reviewer decision");
+            Mark("manual review receipt accepted only for exact tested run");
             var firstHistory = await EngineBridge.RunAsync("history",id);
             Require(firstHistory.ValueKind == JsonValueKind.Array && firstHistory.GetArrayLength() >= 1 &&
                 HistoryList.Items.Count >= 1, "Local history must show checked runs");

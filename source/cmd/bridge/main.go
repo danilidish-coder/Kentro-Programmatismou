@@ -59,9 +59,17 @@ func execute() (any,error) {
    checks,_:=store.LatestChecks(id)
    readyBuild:=store.ReadyForBuild(id)==nil
    readySetup:=store.ReadyForSetup(id)==nil
+   reviewStatus:=store.GetReviewStatus(id)
    root,_:=store.Base(id)
    return map[string]any{"project":p,"manifest":m,"latest":latest,"checks":checks,
-      "ready_build":readyBuild,"ready_setup":readySetup,"folder":root},nil
+      "ready_build":readyBuild,"ready_setup":readySetup,"review_status":reviewStatus,"folder":root},nil
+ case "review-request":
+   if _,e:=require(id);e!=nil{return nil,e}
+   return store.ReviewRequest(id)
+ case "review-import":
+   if _,e:=require(id);e!=nil{return nil,e}
+   path,e:=require(arg(3));if e!=nil{return nil,e}
+   return store.ImportReview(id,path)
  case "checks":
    if _,e:=require(id);e!=nil{return nil,e}
    return store.RunChecks(context.Background(),id,progress)

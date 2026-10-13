@@ -143,7 +143,8 @@ func (s *Store) ReadyForBuild(id string) error {
     if current!=checks.SourceHash || planDigest(m)!=checks.PlanHash {
         return errors.New("Ο κώδικας ή το σχέδιο δοκιμών άλλαξε — χρειάζεται νέος έλεγχος")
     }
-    return nil
+    // The reviewer must explicitly approve the specific check run.
+    return s.checkReview(id)
 }
 
 // BuildChecked is the only GUI-facing EXE build entrypoint. It requires a
