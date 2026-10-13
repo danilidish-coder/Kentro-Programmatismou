@@ -1,0 +1,54 @@
+name: WPF native text clarity diagnostic
+on:
+  push:
+    branches: [diagnostic/wpf-font-clarity]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  diagnostic:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Publish standalone diagnostic EXE
+        run: |
+          dotnet publish diagnostics/WpfTextDiagnostic/WpfTextDiagnostic.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o diagnostic-output
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $exe = 'diagnostic-output/Kentro_Text_Diagnostic_WPF.exe'
+          if (-not (Test-Path $exe)) { throw 'Diagnostic EXE was not created' }
+          $stream = [System.IO.File]::OpenRead((Resolve-Path $exe))
+          try {
+            if ($stream.ReadByte() -ne 77 -or $stream.ReadByte() -ne 90) { throw 'Not a Windows executable' }
+          } finally { $stream.Dispose() }
+      - name: Test WPF window actually opens on Windows
+        run: |
+          $exe = (Resolve-Path './diagnostic-output/Kentro_Text_Diagnostic_WPF.exe').Path
+          $process = Start-Process -FilePath $exe -PassThru
+          try {
+            $opened = $false
+            for($i=0;$i -lt 40;$i++) {
+              Start-Sleep -Seconds 2
+              $process.Refresh()
+              if($process.HasExited) { throw "WPF app exited early with $($process.ExitCode)" }
+              if($process.MainWindowHandle -ne 0) { $opened = $true; break }
+            }
+            if(-not $opened) { throw 'WPF diagnostic window did not become visible' }
+            Write-Host "PASS: WPF EXE launched; visible window $($process.MainWindowHandle)"
+          } finally {
+            if(-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
+          }
+      - name: Publish test EXE directly without ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $sha = "${{ github.sha }}".Substring(0, 12)
+          gh release create "wpf-font-diagnostic-$sha" "./diagnostic-output/Kentro_Text_Diagnostic_WPF.exe" --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "Δοκιμή καθαρότητας γραμμάτων WPF · $sha" --notes "Μόνο δοκιμή γραμματοσειράς. Δύο τρόποι απόδοσης κειμένου (ClearType, Grayscale). Δεν τροποποιεί το Κέντρο Προγραμματισμού." --prerelease
