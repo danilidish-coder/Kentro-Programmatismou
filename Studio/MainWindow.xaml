@@ -49,7 +49,7 @@
        </DockPanel>
        <DockPanel Grid.Column="1" Margin="8,0,0,0">
         <TextBlock x:Name="FileNameLabel" DockPanel.Dock="Top" Text="Επιλέξτε αρχείο" Margin="4,3,0,7"/>
-        <TextBox x:Name="CodeEditor" FontFamily="Consolas" FontSize="13" AcceptsReturn="True" AcceptsTab="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" TextWrapping="No"/>
+        <TextBox x:Name="CodeEditor" FontFamily="Consolas" FontSize="13" AcceptsReturn="True" AcceptsTab="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" TextWrapping="NoWrap"/>
        </DockPanel>
       </Grid>
      </TabItem>
