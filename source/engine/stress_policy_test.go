@@ -17,6 +17,15 @@ func TestDeepStressPlanPreservesSourceAndEnforcesMeaningfulRuns(t *testing.T) {
     if got:=DeepStressPlan(original);got.Repeats!=30||got.Parallel!=15 {t.Fatal("higher user-requested intensity lowered")}
     restart:=DeepStressPlan(StressSpec{Name:"reboot",Kind:"restart",Repeats:1,Parallel:1})
     if restart.Repeats<4 || restart.Parallel!=1 {t.Fatal("restart plan mutated the wrong fields")}
+    sequentialSource:=StressSpec{Name:"heavy-complete-workload",Kind:"sequential",Repeats:1,Parallel:1,TimeoutSeconds:300}
+    sequential:=DeepStressPlan(sequentialSource)
+    if sequential.Repeats!=4 || sequential.Parallel!=1 || sequential.TimeoutSeconds!=300 {
+        t.Fatalf("Sequential is not a completed, one-at-a-time stress scenario: %+v",sequential)
+    }
+    if sequentialSource.Repeats!=1 {t.Fatal("Original manifest was modified")}
+    if !strings.Contains(StressPlanDescription(sequential),"διαδοχικές") {
+        t.Fatal("WPF plan will not describe sequential stress correctly")
+    }
 }
 
 func TestDeepPreflightReportHasHumanReadableStageAndRealCounts(t *testing.T) {

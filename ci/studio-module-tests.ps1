@@ -52,7 +52,10 @@ func main() {}
   "version":"1.0",
   "language":"Go",
   "tests":[{"name":"Unit and compatibility","command":"go","args":["test","-run","TestReady","./..."],"timeout_seconds":120}],
-  "stress":[{"name":"Concurrent independent modules","kind":"parallel","command":"go","args":["test","-run","TestReady","./..."],"parallel":2,"repeats":2,"timeout_seconds":120}],
+  "stress":[
+    {"name":"Concurrent independent modules","kind":"parallel","command":"go","args":["test","-run","TestReady","./..."],"parallel":2,"repeats":2,"timeout_seconds":120},
+    {"name":"Completed sequential heavy workload","kind":"sequential","module":"INTEGRATION","command":"go","args":["test","-run","TestReady","./..."],"parallel":1,"repeats":4,"timeout_seconds":300}
+  ],
   "build":{"name":"Build Windows PE","command":"go","args":["build","-o","app.exe","."],"timeout_seconds":120},
   "smoke":{"name":"Start built executable","command":"./app.exe","expect_contains":"WINDOW_STAYS_OPEN","timeout_seconds":30},
   "setup":{"name":"Optional setup binary","command":"go","args":["build","-o","setup-installer.exe","./setup"],"timeout_seconds":120}
@@ -73,7 +76,7 @@ func main() {}
   $listed = @(Bridge 'list')
   Assert ($listed.Count -eq 1) 'Project list after import'
   $detail = Bridge 'details' $id
-  Assert ($detail.project.id -eq $id -and $detail.manifest.tests.Count -eq 1 -and $detail.manifest.stress.Count -eq 1) 'Manifest/identity in details'
+  Assert ($detail.project.id -eq $id -and $detail.manifest.tests.Count -eq 1 -and $detail.manifest.stress.Count -eq 2) 'Manifest/identity in details'
   Assert (-not $detail.ready_build -and -not $detail.ready_setup) 'Build and setup must be initially locked'
   Log 'PASS: ZIP import, project list, manifest parsing and disabled gates'
   $null = Bridge 'build' $id $true
@@ -82,7 +85,8 @@ func main() {}
   $checks = Bridge 'checks' $id
   Assert ($checks.stage -eq 'CHECKS' -and -not $checks.blocked) 'Complete checks stage must pass'
   Assert (@($checks.results | Where-Object {$_.phase -eq 'TEST' -and $_.status -eq 'PASS'}).Count -ge 1) 'Positive unit tests'
-  Assert (@($checks.results | Where-Object {$_.phase -eq 'STRESS' -and $_.status -eq 'PASS'}).Count -ge 1) 'Stress tests'
+  Assert (@($checks.results | Where-Object {$_.phase -eq 'STRESS' -and $_.status -eq 'PASS'}).Count -ge 2) 'Parallel and sequential stress tests'
+  Assert (@($checks.results | Where-Object {$_.phase -eq 'STRESS' -and $_.reason -like '*διαδοχικές*'}).Count -eq 1) 'Sequential workload completes without killing test subprocesses'
   $afterChecks = Bridge 'details' $id
   Assert (-not $afterChecks.ready_build -and -not $afterChecks.ready_setup -and
           $afterChecks.review_status.status -eq 'WAITING_REVIEW') 'Build must await human review'

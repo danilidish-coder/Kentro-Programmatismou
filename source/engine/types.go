@@ -27,7 +27,7 @@ func (s Step) Mandatory() bool { return s.Required == nil || *s.Required }
 type StressSpec struct {
 	Module         string   `json:"module,omitempty"`
 	Name           string   `json:"name"`
-	Kind           string   `json:"kind"` // parallel or restart
+	Kind           string   `json:"kind"` // parallel, sequential, or restart
 	Command        string   `json:"command"`
 	Args           []string `json:"args"`
 	Parallel       int      `json:"parallel"`
@@ -256,12 +256,21 @@ func ValidateManifest(m Manifest) error {
 	}
 	for _, x := range m.Stress {
 		if len(x.Module)>100 || strings.ContainsAny(x.Module,"\r\n\x00") {return errors.New("Μη έγκυρη ενότητα stress test")}
-		if x.Parallel < 0 || x.Parallel > 16 || x.Repeats < 0 || x.Repeats > 50 || x.TimeoutSeconds > 120 {
-			return errors.New("Μη έγκυρες παράμετροι πίεσης")
-		}
-		if x.Kind != "parallel" && x.Kind != "restart" {
-			return errors.New("Μη αναγνωρισμένο είδος δοκιμής πίεσης")
-		}
+        if x.Kind != "parallel" && x.Kind != "sequential" && x.Kind != "restart" {
+            return fmt.Errorf("Stress test %q: άγνωστο είδος %q. Επιλογές: parallel, sequential, restart",x.Name,x.Kind)
+        }
+        maxSeconds:=120
+        if x.Kind=="sequential" {maxSeconds=900}
+        if x.Parallel<0 || x.Parallel>16 || x.Repeats<0 || x.Repeats>50 ||
+           x.TimeoutSeconds<0 || x.TimeoutSeconds>maxSeconds {
+            return fmt.Errorf("Stress test %q: μη έγκυρες παράμετροι (kind=%s, parallel=%d, repeats=%d, timeout=%ds, μέγιστο %ds)",x.Name,x.Kind,x.Parallel,x.Repeats,x.TimeoutSeconds,maxSeconds)
+        }
+        if (x.Kind=="sequential" || x.Kind=="restart") && x.Parallel>1 {
+            return fmt.Errorf("Stress test %q: %s δεν επιτρέπει παράλληλη εκτέλεση",x.Name,x.Kind)
+        }
+        if x.Kind=="restart" && x.Health==nil {
+            return fmt.Errorf("Stress test %q: απαιτείται βήμα health μετά από πραγματική αναγκαστική επανεκκίνηση",x.Name)
+        }
 		if e := validateStep(Step{Command: x.Command, Args: x.Args, Name: x.Name, TimeoutSeconds: x.TimeoutSeconds}); e != nil {
 			return e
 		}

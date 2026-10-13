@@ -64,14 +64,18 @@ public partial class MainWindow
         }
         foreach (var stress in ArrayProperty(manifest, "stress"))
         {
-            var restarts = Value(stress, "kind") == "restart";
-            int repeats = Math.Max(IntValue(stress, "repeats", 0), restarts ? 4 : 6);
-            int parallel = restarts ? 1 : Math.Max(IntValue(stress, "parallel", 0), 3);
+            var kind = Value(stress,"kind");
+            var restarts = kind == "restart";
+            var sequential = kind == "sequential";
+            int repeats = Math.Max(IntValue(stress, "repeats", 0), restarts || sequential ? 4 : 6);
+            int parallel = restarts || sequential ? 1 : Math.Max(IntValue(stress, "parallel", 0), 3);
             int seconds = IntValue(stress, "timeout_seconds", 0);
             if (seconds == 0) seconds = 90;
             var description = restarts
-                ? $"Επανεκκινήσεις: {repeats}"
-                : $"Επαναλήψεις: {repeats} · Παράλληλες: έως {parallel}";
+                ? $"Αναγκαστικές επανεκκινήσεις: {repeats}"
+                : sequential
+                    ? $"Διαδοχικές πλήρεις εκτελέσεις: {repeats} · Μία κάθε φορά"
+                    : $"Επαναλήψεις: {repeats} · Παράλληλες: έως {parallel}";
             PlanList.Items.Add($"STRESS · {ModuleOf(stress)} · {StepName(stress)}\n" +
                 $"{description} · Όριο ανά εκτέλεση: {seconds} δευτ.\n" +
                 $"Εντολή: {StepCommand(stress)}");

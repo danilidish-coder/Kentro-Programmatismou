@@ -39,7 +39,11 @@ func runStress(ctx context.Context, work, logs string, i int, sp StressSpec) Res
 		count = 3
 	}
 	parallel := sp.Parallel
-	if parallel <= 0 {
+	if sp.Kind == "sequential" {
+        // Heavy workload: complete every run before starting the next;
+        // unlike restart stress, never kill a script before it finishes.
+        parallel = 1
+    } else if parallel <= 0 {
 		parallel = 2
 	}
 	start := time.Now()
@@ -92,7 +96,11 @@ func runStress(ctx context.Context, work, logs string, i int, sp StressSpec) Res
 	} else {
 		r.Status = "PASS"
 		r.ExitCode = 0
-		r.Reason = fmt.Sprintf("%d επαναλήψεις, έως %d παράλληλες εκτελέσεις", count, parallel)
+		if sp.Kind=="sequential" {
+            r.Reason=fmt.Sprintf("%d πλήρεις διαδοχικές εκτελέσεις",count)
+        } else {
+		    r.Reason = fmt.Sprintf("%d επαναλήψεις, έως %d παράλληλες εκτελέσεις", count, parallel)
+        }
 	}
 	return r
 }

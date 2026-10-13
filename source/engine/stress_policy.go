@@ -7,8 +7,9 @@ import "fmt"
 // coverage of every realistic concurrency or infrastructure failure.
 func DeepStressPlan(in StressSpec) StressSpec {
     out:=in
-    if out.Kind=="restart" {
+    if out.Kind=="restart" || out.Kind=="sequential" {
         if out.Repeats<4 {out.Repeats=4}
+        out.Parallel=1
     } else {
         if out.Repeats<6 {out.Repeats=6}
         if out.Parallel<3 {out.Parallel=3}
@@ -19,6 +20,9 @@ func DeepStressPlan(in StressSpec) StressSpec {
 func StressPlanDescription(sp StressSpec) string {
     if sp.Kind=="restart" {
         return fmt.Sprintf("%s: %d κύκλοι αναγκαστικού τερματισμού και ανάκαμψης",sp.Name,sp.Repeats)
+    }
+    if sp.Kind=="sequential" {
+        return fmt.Sprintf("%s: %d διαδοχικές πλήρεις εκτελέσεις (μία κάθε φορά)",sp.Name,sp.Repeats)
     }
     return fmt.Sprintf("%s: %d επαναλήψεις με έως %d παράλληλες εργασίες",sp.Name,sp.Repeats,sp.Parallel)
 }

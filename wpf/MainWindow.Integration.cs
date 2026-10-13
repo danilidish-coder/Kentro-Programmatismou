@@ -43,6 +43,12 @@ public partial class MainWindow
             Mark("actual UI import and initial safety gates");
             Require(PlanList.Items.Count >= 4, "Real pipeline plan must be visible in the WPF inspector");
             Mark("pipeline plan explorer populated from imported manifest");
+            bool sequentialShown = false;
+            foreach (var line in PlanList.Items)
+                if (line is string entry && entry.Contains("Διαδοχικές πλήρεις εκτελέσεις"))
+                    sequentialShown = true;
+            Require(sequentialShown, "Native WPF must display full sequential runs separately from forced restarts");
+            Mark("WPF explicitly distinguishes sequential complete tests from restart stress");
 
             if (!string.IsNullOrWhiteSpace(screenshot))
             {
