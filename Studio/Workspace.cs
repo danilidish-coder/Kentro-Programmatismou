@@ -347,6 +347,10 @@ public static class Workspace
   Directory.CreateDirectory(Path.GetDirectoryName(preserved)!);
   Directory.Move(old,preserved);
   SaveSnapshot(id,"Επαναφορά παλαιότερης έκδοσης "+snapshotId[..8]);
+  // A restore is a new operational revision even when bytes match older tests.
+  // Prior check runs must never authorize builds after a restore.
+  File.WriteAllText(Path.Combine(DirectoryOf(id),"checks-invalidated.flag"),
+    DateTime.UtcNow.Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture));
  }
  public static string RunDir(string id,string runId)
  {

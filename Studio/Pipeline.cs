@@ -229,6 +229,11 @@ public static class Pipeline
  public static ReviewRequest GetReviewRequest(string id)
  {
   var checks=Workspace.LastChecks(id)??throw new InvalidOperationException("Δεν υπάρχουν έλεγχοι");
+  string invalidated=Path.Combine(Workspace.DirectoryOf(id),"checks-invalidated.flag");
+  if(File.Exists(invalidated)&&
+     long.TryParse(File.ReadAllText(invalidated),out long resetTicks)&&
+     checks.Started.Ticks<=resetTicks)
+   throw new InvalidOperationException("Έγινε επαναφορά έκδοσης μετά τους ελέγχους: απαιτούνται νέα τεστ και νέα έγκριση");
   if(checks.Blocked||checks.Status=="ΑΚΥΡΩΘΗΚΕ")
    throw new InvalidOperationException("Οι έλεγχοι απέτυχαν. Δεν μπορεί να δοθεί έγκριση");
   if(checks.SourceSha256!=Workspace.HashTree(Workspace.SourceOf(id))||
