@@ -1,13 +1,13 @@
-name: NEW Offline Studio V2 — real Windows acceptance, portable toolchains and standalone EXE
+name: Offline Studio V2 — full Windows acceptance plus install, upgrade, uninstall
 on:
   push:
-    branches: [rewrite/offline-studio-v2]
+    branches: [feature/offline-studio-v2-installer]
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
   complete_windows_validation:
-    name: Offline Python / Go / .NET / Node + WPF + real EXE build
+    name: All offline toolchains + native GUI + installed Windows Setup acceptance
     runs-on: windows-2022
     timeout-minutes: 120
     defaults:
@@ -93,6 +93,28 @@ jobs:
             if(-not($log.Contains($word))){throw "Missing Windows acceptance proof: $word"}
           }
           "Windows acceptance markers PASS" | Tee-Object -FilePath studio-final-verification.log
+      - name: Compile self-contained Windows Setup using Inno Setup 6
+        run: |
+          $ErrorActionPreference='Stop'
+          $compiler=Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if(-not(Test-Path -LiteralPath $compiler)){
+            choco install innosetup --yes --no-progress --limit-output
+            if($LASTEXITCODE -ne 0){throw "Inno Setup compiler unavailable (exit=$LASTEXITCODE)"}
+          }
+          if(-not(Test-Path -LiteralPath $compiler)){throw "Inno Setup compiler is not installed"}
+          & $compiler '/Qp' 'installer/Kentro_Programmatismou.iss' 2>&1 | Tee-Object installer-compile.log
+          if($LASTEXITCODE -ne 0){throw "Setup compilation failed (exit=$LASTEXITCODE)"}
+          $setup='installer-output/Kentro_Programmatismou_Setup_v2.0.1.exe'
+          if(-not(Test-Path $setup) -or (Get-Item $setup).Length -lt 150000000){throw "Installer missing application payload"}
+          Get-FileHash -Path $setup -Algorithm SHA256 | Format-List | Out-String | Tee-Object -FilePath installer-setup-sha256.log
+      - name: REAL user-level Windows acceptance — install, GUI open, same-version upgrade, uninstall, project data retained
+        run: |
+          ./ci/test-installer.ps1
+          if(-not(Test-Path installer-windows-qa.log)){throw 'Real installer tests did not emit report'}
+          $testReport=Get-Content installer-windows-qa.log -Raw
+          foreach($proof in @('PASS: first-install EXE installed','PASS: Installed GUI starts','PASS: in-place-upgrade EXE installed','PASS: In-place upgrade creates ONE Windows uninstall entry','PASS: Uninstall removes program executable','PASS: after-uninstall - exact SHA256 project data preserved','ALL INSTALLER WINDOWS TESTS PASSED')){
+            if(-not $testReport.Contains($proof)){throw "Installer report missing proof: $proof"}
+          }
       - name: Upload detailed diagnostics for audit
         if: always()
         uses: actions/upload-artifact@v4
@@ -106,12 +128,15 @@ jobs:
             studio-wpf.png
             studio-final-verification.log
             runtime-package.log
+            installer-compile.log
+            installer-setup-sha256.log
+            installer-windows-qa.log
           if-no-files-found: warn
-      - name: Publish ONE verified offline Studio EXE as test prerelease
-        if: success() && github.ref == 'refs/heads/rewrite/offline-studio-v2'
+      - name: Publish ONE fully validated Windows Installer EXE as prerelease
+        if: success() && github.ref == 'refs/heads/feature/offline-studio-v2-installer'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $sha="${{ github.sha }}".Substring(0,12)
-          $tag="offline-studio-v2-test-$sha"
-          gh release create $tag './publish/Kentro_Programmatismou.exe' --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "Κέντρο Προγραμματισμού · αυτόνομο v2 · $sha" --notes "Δοκιμαστική καθαρή επανεγγραφή από μηδέν. Περιλαμβάνει φορητά Python/PyInstaller/PySide6, Go, .NET 8 SDK και Node χωρίς ανάγκη εγκατάστασης. Επιβεβαιωμένα Windows acceptance με πραγματικό EXE, WPF GUI, δοκιμές, παρακολούθηση εκδόσεων και χειροκίνητη έγκριση ChatGPT. Ένα EXE. Προηγούμενες υπηρεσιακές εφαρμογές ανέπαφες." --prerelease
+          $tag="offline-studio-v2-installer-$sha"
+          gh release create $tag './installer-output/Kentro_Programmatismou_Setup_v2.0.1.exe' --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "Κέντρο Προγραμματισμού · εγκατάσταση Windows v2.0.1 · $sha" --notes "Εγκαταστάτης Windows χωρίς δικαιώματα διαχειριστή. Νέα συντόμευση επιφάνειας εργασίας και Έναρξης. Η εγκατάσταση και η επόμενη αναβάθμιση αντικαθιστούν την προηγούμενη εγκατεστημένη έκδοση χωρίς απώλεια έργων, πηγαίων, ιστορικού ή αναφορών. Επιτυχείς πραγματικοί Windows CI έλεγχοι: πρόγραμμα, εγκατάσταση, λειτουργία γραφικού παραθύρου, επανεγκατάσταση, απεγκατάσταση και ακεραιότητα των δεδομένων. Οι παλιές φορητές λήψεις EXE δεν διαγράφονται αυτόματα." --prerelease
