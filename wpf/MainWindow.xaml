@@ -207,6 +207,51 @@
        </StackPanel>
       </Border>
      </primitives:UniformGrid>
+     <!-- GitHub-style pipeline plan and run history, local-only. -->
+     <Expander Name="PlanExpander" Header="ΠΛΑΝΟ ΕΛΕΓΧΩΝ — ΤΙ ΘΑ ΕΚΤΕΛΕΣΤΕΙ"
+      Background="#0B263E" Foreground="#F1FAFF" BorderBrush="#387BA3"
+      BorderThickness="1" Margin="0,0,0,12" Padding="12"
+      IsExpanded="False">
+      <ListBox Name="PlanList" Background="#071F33" Foreground="#EAF6FF"
+       BorderBrush="#326C91" BorderThickness="1" Padding="8"
+       FontSize="13" MaxHeight="250"
+       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+       <ListBox.ItemTemplate>
+        <DataTemplate>
+         <TextBlock Text="{Binding}" TextWrapping="Wrap"
+          Foreground="#EAF6FF" Margin="2,5"/>
+        </DataTemplate>
+       </ListBox.ItemTemplate>
+      </ListBox>
+     </Expander>
+     <Expander Name="HistoryExpander" Header="ΙΣΤΟΡΙΚΟ ΕΛΕΓΧΩΝ — ΑΙΤΙΑ ΑΠΟΤΥΧΙΑΣ"
+      Background="#0B263E" Foreground="#F1FAFF" BorderBrush="#387BA3"
+      BorderThickness="1" Margin="0,0,0,12" Padding="12"
+      IsExpanded="False">
+      <StackPanel>
+       <TextBlock Name="HistoryStatus" Foreground="#B9D7E9" FontSize="13"
+        Text="Δεν υπάρχουν ακόμη εκτελέσεις." Margin="0,0,0,6"/>
+       <ListBox Name="HistoryList" Background="#071F33"
+        BorderBrush="#326C91" BorderThickness="1" Foreground="#F6FAFF"
+        MaxHeight="160" SelectionChanged="History_SelectionChanged">
+        <ListBox.ItemTemplate>
+         <DataTemplate>
+          <StackPanel Margin="4,6">
+           <TextBlock Text="{Binding Caption}" Foreground="#F4FAFF"
+            FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"/>
+           <TextBlock Text="{Binding Status}" Foreground="#B8D6E9"
+            FontSize="12" TextWrapping="Wrap"/>
+          </StackPanel>
+         </DataTemplate>
+        </ListBox.ItemTemplate>
+       </ListBox>
+       <TextBox Name="HistoryDetail" Margin="0,9,0,0" Background="#071F33"
+        Foreground="#EAF6FF" BorderBrush="#326C91" FontSize="13"
+        IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+        MinHeight="90" MaxHeight="235" AcceptsReturn="True"
+        Text="Επίλεξε μια εκτέλεση για λεπτομέρειες."/>
+      </StackPanel>
+     </Expander>
      <Border Style="{StaticResource Panel}" MinHeight="250">
       <Grid>
        <Grid.RowDefinitions>

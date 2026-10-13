@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"context"
+	"errors"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -172,9 +173,16 @@ func runStep(ctx context.Context, work, logDir, phase, basename string, t Step) 
 		}
 	} else {
 		r.Status = "FAIL"
-		if ctx2.Err() != nil {
-			r.Reason = "Υπέρβαση χρονικού ορίου ή ακύρωση"
-		} else {
+		switch {
+		case errors.Is(ctx.Err(), context.Canceled):
+			r.Status = "CANCELLED"
+			r.FailureKind = "CANCELLED"
+			r.Reason = "Ο έλεγχος ακυρώθηκε από τον χειριστή"
+		case errors.Is(ctx2.Err(), context.DeadlineExceeded):
+			r.FailureKind = "TIMEOUT"
+			r.Reason = fmt.Sprintf("Υπέρβαση χρονικού ορίου %d δευτερολέπτων", sec)
+		default:
+			r.FailureKind = "COMMAND_ERROR"
 			r.Reason = redact(e.Error())
 		}
 		if x, ok := e.(*exec.ExitError); ok {

@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"sync"
 	"time"
+	"strings"
 )
 
 func runStress(ctx context.Context, work, logs string, i int, sp StressSpec) Result {
@@ -71,18 +72,23 @@ func runStress(ctx context.Context, work, logs string, i int, sp StressSpec) Res
 	close(errs)
 	bad := 0
 	reason := ""
+	timedOut := 0
+	cancelled := 0
 	for s := range errs {
 		if s != "" {
 			bad++
 			if reason == "" {
 				reason = s
 			}
+			if strings.Contains(s, "Υπέρβαση χρονικού ορίου") { timedOut++ }
+			if strings.Contains(s, "CANCELLED") || strings.Contains(s, "Ακυρώθηκ") { cancelled++ }
 		}
 	}
 	r.DurationMS = time.Since(start).Milliseconds()
 	if bad > 0 {
 		r.Status = "FAIL"
-		r.Reason = fmt.Sprintf("%d/%d αποτυχίες: %s", bad, count, reason)
+		r.Reason = fmt.Sprintf("%d/%d αποτυχίες (χρονικό όριο: %d, ακυρώσεις: %d): %s", bad, count, timedOut, cancelled, reason)
+		if timedOut > 0 { r.FailureKind = "TIMEOUT" } else if cancelled > 0 { r.FailureKind = "CANCELLED" } else { r.FailureKind = "COMMAND_ERROR" }
 	} else {
 		r.Status = "PASS"
 		r.ExitCode = 0

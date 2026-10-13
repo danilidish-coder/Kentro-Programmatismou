@@ -13,6 +13,7 @@ import (
 const ProductVersion = "1.0.0-beta8"
 
 type Step struct {
+	Module         string   `json:"module,omitempty"`
 	Name           string   `json:"name"`
 	ExpectContains string   `json:"expect_contains,omitempty"`
 	Command        string   `json:"command"`
@@ -24,6 +25,7 @@ type Step struct {
 func (s Step) Mandatory() bool { return s.Required == nil || *s.Required }
 
 type StressSpec struct {
+	Module         string   `json:"module,omitempty"`
 	Name           string   `json:"name"`
 	Kind           string   `json:"kind"` // parallel or restart
 	Command        string   `json:"command"`
@@ -225,6 +227,7 @@ func ValidateManifest(m Manifest) error {
 		return errors.New("Πάρα πολλά σενάρια")
 	}
 	for _, t := range m.Tests {
+		if len(t.Module)>100 || strings.ContainsAny(t.Module,"\r\n\x00") {return errors.New("Μη έγκυρη ενότητα τεστ")}
 		if e := validateStep(t); e != nil {
 			return e
 		}
@@ -251,6 +254,7 @@ func ValidateManifest(m Manifest) error {
 		}
 	}
 	for _, x := range m.Stress {
+		if len(x.Module)>100 || strings.ContainsAny(x.Module,"\r\n\x00") {return errors.New("Μη έγκυρη ενότητα stress test")}
 		if x.Parallel < 0 || x.Parallel > 16 || x.Repeats < 0 || x.Repeats > 50 || x.TimeoutSeconds > 120 {
 			return errors.New("Μη έγκυρες παράμετροι πίεσης")
 		}

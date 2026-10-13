@@ -49,6 +49,9 @@ func execute() (any,error) {
    p,e:=require(id);if e!=nil{return nil,e}
    if _,e=engine.PreviewZIP(p);e!=nil{return nil,e}
    return store.ImportZIP(p)
+ case "history":
+   if _,e:=require(id);e!=nil{return nil,e}
+   return store.History(id,25)
  case "details":
    if _,e:=require(id);e!=nil{return nil,e}
    p,m,e:=store.Get(id);if e!=nil{return nil,e}

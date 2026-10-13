@@ -258,6 +258,27 @@ func (s *Store) ExportLatest(id string) (string, error) {
 	}
 	junit.WriteString("</testsuite>\n")
 	entries["results.junit.xml"] = []byte(junit.String())
+	// Preserve the evidence needed to diagnose failed tests and timeouts.
+	// Only bounded, ordinary text logs produced inside this run are exported.
+	logDir := filepath.Join(dir, "logs")
+	logFiles, logErr := os.ReadDir(logDir)
+	if logErr != nil && !errors.Is(logErr, os.ErrNotExist) { return "", logErr }
+	if len(logFiles) > 200 { return "", errors.New("Πάρα πολλά αρχεία καταγραφής στην αναφορά") }
+	var totalLogBytes int64
+	for _, file := range logFiles {
+		if file.IsDir() || !file.Type().IsRegular() { continue }
+		if !strings.HasSuffix(strings.ToLower(file.Name()), ".txt") { continue }
+		if !zipPathOK(file.Name()) { continue }
+		info, err := file.Info()
+		if err != nil { return "", err }
+		if info.Size() > 250000 || totalLogBytes + info.Size() > 16000000 {
+			return "", errors.New("Υπέρβαση ασφαλούς ορίου αρχείων καταγραφής")
+		}
+		content, err := os.ReadFile(filepath.Join(logDir, file.Name()))
+		if err != nil { return "", err }
+		totalLogBytes += int64(len(content))
+		entries["logs/"+file.Name()] = content
+	}
 	names := make([]string, 0, len(entries))
 	for name := range entries {
 		names = append(names, name)

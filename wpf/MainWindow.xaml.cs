@@ -99,6 +99,10 @@ public partial class MainWindow : Window
                 ProjectNameText.Text = "Δεν έχει εισαχθεί πρόγραμμα";
                 ProjectInfoText.Text = "Πατήστε «Εισαγωγή προγράμματος ZIP»";
                 StageText.Text = "Επόμενο βήμα: εισαγωγή ZIP έργου";
+                PlanList.Items.Clear();
+                HistoryList.ItemsSource = null;
+                HistoryDetail.Text = "Επίλεξε ένα έργο για να δεις τις εκτελέσεις.";
+                HistoryStatus.Text = "Δεν υπάρχει επιλεγμένο έργο.";
                 SetButtons();
             }
             else await RefreshDetailsAsync();
@@ -123,7 +127,8 @@ public partial class MainWindow : Window
             if (_busy || _selected != id) return;
             var project = details.GetProperty("project");
             var manifest = details.GetProperty("manifest");
-            ProjectNameText.Text = Value(project,"name","Πρόγραμμα");
+            ShowPlan(manifest);
+            ProjectNameText = Value(project,"name","Πρόγραμμα");
             int tests = manifest.TryGetProperty("tests",out var a) && a.ValueKind == JsonValueKind.Array ? a.GetArrayLength() : 0;
             int stress = manifest.TryGetProperty("stress",out var b) && b.ValueKind == JsonValueKind.Array ? b.GetArrayLength() : 0;
             ProjectInfoText.Text = "Έκδοση "+Value(project,"version","—")+" · "+
@@ -141,6 +146,7 @@ public partial class MainWindow : Window
             StageText.Text = setup ? "Επιτυχής κατασκευή EXE · Διαθέσιμο Setup" :
                 checks ? "Οι έλεγχοι πέρασαν · Μπορεί να κατασκευαστεί EXE" :
                 "Επόμενο βήμα: λειτουργικοί έλεγχοι και stress tests";
+            await RefreshHistoryAsync(id);
         }
         catch(Exception ex)
         {

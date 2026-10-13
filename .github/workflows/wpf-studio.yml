@@ -1,7 +1,7 @@
 name: WPF Studio Windows full validation and direct EXE
 on:
   push:
-    branches: [feature/wpf-studio]
+    branches: [feature/wpf-pipeline-dashboard]
   workflow_dispatch:
 permissions:
   contents: write
@@ -81,10 +81,10 @@ jobs:
             wpf-crash.log
           if-no-files-found: warn
       - name: Publish direct standalone WPF EXE as test prerelease
-        if: success() && github.ref == 'refs/heads/feature/wpf-studio' && github.event_name == 'push'
+        if: success() && github.ref == 'refs/heads/feature/wpf-pipeline-dashboard' && github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $sha = "${{ github.sha }}".Substring(0,12)
-          $tag = "wpf-studio-test-$sha"
-          gh release create $tag "./single/Kentro_Programmatismou.exe" --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "Κέντρο Προγραμματισμού · WPF δοκιμή $sha" --notes "Δοκιμαστική WPF εμφάνιση για καθαρά ελληνικά σε Windows 10. Ακριβώς ένα EXE, χωρίς ZIP ή εγκατάσταση runtime. Η σταθερή εφαρμογή και το WinUI 3 παραμένουν ανέπαφα." --prerelease
+          $tag = "wpf-pipeline-test-$sha"
+          gh release create $tag "./single/Kentro_Programmatismou.exe" --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "Κέντρο Προγραμματισμού · WPF Pipeline $sha" --notes "Δοκιμαστική WPF Pipeline: προβολή σχεδίου ελέγχων, ιστορικό CI εκτελέσεων και διάγνωση αποτυχιών με logs. Ένα EXE χωρίς ZIP. Η προηγούμενη σταθερή έκδοση παραμένει ανέπαφη." --prerelease

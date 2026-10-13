@@ -41,6 +41,8 @@ public partial class MainWindow
             Require(ProjectNameText.Text == Value(imported.GetProperty("project"),"name"),
                 "WPF project name and native controls");
             Mark("actual UI import and initial safety gates");
+            Require(PlanList.Items.Count >= 4, "Real pipeline plan must be visible in the WPF inspector");
+            Mark("pipeline plan explorer populated from imported manifest");
 
             if (!string.IsNullOrWhiteSpace(screenshot))
             {
@@ -63,6 +65,10 @@ public partial class MainWindow
                     BuildButton.IsEnabled && !SetupButton.IsEnabled,
                 "Build must unlock only after passing test/stress");
             Mark("UI-driven tests and stress unlock EXE");
+            var firstHistory = await EngineBridge.RunAsync("history",id);
+            Require(firstHistory.ValueKind == JsonValueKind.Array && firstHistory.GetArrayLength() >= 1 &&
+                HistoryList.Items.Count >= 1, "Local history must show checked runs");
+            Mark("verified persisted checks history and local diagnostic viewer");
 
             await ExecuteAsync("build","CI build and Windows PE smoke");
             var buildDetails = await EngineBridge.RunAsync("details",id);
@@ -76,6 +82,10 @@ public partial class MainWindow
             Require(Value(latest,"stage") == "SETUP" && !latest.GetProperty("blocked").GetBoolean(),
                 "Independent Setup operation");
             Mark("UI-driven optional Setup");
+            var completeHistory = await EngineBridge.RunAsync("history",id);
+            Require(completeHistory.GetArrayLength() >= 3 && HistoryList.Items.Count >= 3,
+                "History must show checks, build, setup as distinct persisted stages");
+            Mark("full locally persisted multi-stage run history");
 
             var report = await ExportReportAsync(false);
             Require(File.Exists(report),"Persistent report with Greek filename");
