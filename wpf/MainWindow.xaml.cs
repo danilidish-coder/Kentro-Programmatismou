@@ -128,7 +128,7 @@ public partial class MainWindow : Window
             var project = details.GetProperty("project");
             var manifest = details.GetProperty("manifest");
             ShowPlan(manifest);
-            ProjectNameText = Value(project,"name","Πρόγραμμα");
+            ProjectNameText.Text = Value(project,"name","Πρόγραμμα");
             int tests = manifest.TryGetProperty("tests",out var a) && a.ValueKind == JsonValueKind.Array ? a.GetArrayLength() : 0;
             int stress = manifest.TryGetProperty("stress",out var b) && b.ValueKind == JsonValueKind.Array ? b.GetArrayLength() : 0;
             ProjectInfoText.Text = "Έκδοση "+Value(project,"version","—")+" · "+
