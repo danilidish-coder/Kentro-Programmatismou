@@ -136,3 +136,20 @@ func TestReviewRejectedWhenChecksFail(t *testing.T){
  if _,err:=s.ReviewRequest(id);err==nil{t.Fatal("Review request created for failed checks")}
  if err:=s.ReadyForBuild(id);err==nil{t.Fatal("Build unlocked for failed checks")}
 }
+
+func TestInferredPlanCannotReceiveExternalReview(t *testing.T){
+ s:=newTestStore(t)
+ p,err:=s.ImportZIP(zipFixture(t,map[string]string{
+  "go.mod":"module local.example/no-manifest\n\ngo 1.23\n",
+  "main.go":"package main\nfunc main(){}\n",
+ }))
+ if err!=nil{t.Fatal(err)}
+ syntheticPassedChecks(t,s,p.ID,time.Now())
+ if _,err:=s.ReviewRequest(p.ID);err==nil ||
+  !strings.Contains(err.Error(),"project-manifest.json"){
+  t.Fatalf("Automatically inferred plan became externally approvable: %v",err)
+ }
+ if err:=s.ReadyForBuild(p.ID);err==nil{
+  t.Fatal("Auto-inferred plan bypassed manual review")
+ }
+}

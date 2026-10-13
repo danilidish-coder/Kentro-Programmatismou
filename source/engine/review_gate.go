@@ -46,6 +46,13 @@ func (s *Store) reviewRequest(id string) (ReviewTicket,error) {
  if err!=nil{return empty,err}
  base,err:=s.Base(id)
  if err!=nil{return empty,err}
+ // Final release approval requires a plan explicitly prepared for this project.
+ // Automatic discovery is useful for preview, never sufficient for sign-off.
+ planFile:=filepath.Join(base,"source","project-manifest.json")
+ planInfo,err:=os.Stat(planFile)
+ if err!=nil || !planInfo.Mode().IsRegular() {
+  return empty,errors.New("Απαιτείται ρητό σχέδιο ελέγχων project-manifest.json από τον βοηθό")
+ }
  current,err:=HashTree(filepath.Join(base,"source"))
  if err!=nil{return empty,err}
  if current!=checks.SourceHash || planDigest(m)!=checks.PlanHash {
