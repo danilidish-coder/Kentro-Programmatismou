@@ -65,9 +65,6 @@ func (s *Store) Approve(id string) (string, error) {
     if run.Stage==StageChecks || run.Stage==StageSetup {
         return "",errors.New("Δεν εγκρίνεται έκδοση χωρίς πραγματική κατασκευή και έλεγχο EXE")
     }
-    if run.Stage==StageBuild {
-        if err:=s.ReadyForBuild(id);err!=nil{return "",err}
-    }
     if run.PlanHash=="" || run.PlanHash!=planDigest(manifest) {
         return "",errors.New("Το σχέδιο ελέγχων άλλαξε — απαιτούνται νέοι έλεγχοι")
     }
@@ -97,6 +94,11 @@ func (s *Store) Approve(id string) (string, error) {
         if hex.EncodeToString(digest[:])!=art.SHA256 || int64(len(data))!=art.Bytes {
             return "",errors.New("Αλλοιώθηκε το παραγόμενο EXE μετά τους ελέγχους")
         }
+    }
+    // Inspect the real EXE and required phases first; then enforce the
+    // reviewer gate before any stable-version write.
+    if run.Stage==StageBuild {
+        if err:=s.ReadyForBuild(id);err!=nil{return "",err}
     }
     dst := filepath.Join(root, "stable", run.ID)
 	if exists(dst) {

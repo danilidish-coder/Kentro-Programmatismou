@@ -48,6 +48,7 @@ func TestTamperedExeNeverPromoted(t *testing.T) {
     s,id:=stageFixture(t,false)
     checks,e:=s.RunChecks(context.Background(),id,nil)
     if e!=nil||checks.Blocked{t.Fatalf("checks failed %v %+v",e,checks.Results)}
+    approveSyntheticReview(t,s,id)
     build,e:=s.BuildChecked(context.Background(),id,nil)
     if e!=nil||build.Blocked{t.Fatalf("build failed: %v %+v",e,build.Results)}
     dir:=filepath.Join(mustBase(t,s,id),"runs",build.ID,"artifacts")
