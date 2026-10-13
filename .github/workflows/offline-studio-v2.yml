@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  actions: write
 jobs:
   complete_windows_validation:
     name: All offline toolchains + native GUI + installed Windows Setup acceptance
@@ -14,6 +15,22 @@ jobs:
       run:
         shell: pwsh
     steps:
+      - name: Cancel superseded installer CI runs from the same branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $current=[long]"${{ github.run_id }}"
+          $url="repos/${{ github.repository }}/actions/workflows/offline-studio-v2.yml/runs?branch=feature/offline-studio-v2-installer&status=in_progress&per_page=30"
+          $old=gh api $url | ConvertFrom-Json
+          if($LASTEXITCODE -ne 0){Write-Warning "Cannot inspect older CI runs";exit 0}
+          foreach($run in $old.workflow_runs){
+            if([long]$run.id -lt $current){
+              Write-Host "Cancelling superseded installer CI $($run.id)"
+              gh api -X POST "repos/${{ github.repository }}/actions/runs/$($run.id)/cancel"
+              if($LASTEXITCODE -ne 0){Write-Warning "Could not cancel old run $($run.id)"}
+            }
+          }
       - name: Checkout fresh standalone source
         uses: actions/checkout@v4
       - name: Setup Python for packaging portable interpreter
@@ -108,6 +125,7 @@ jobs:
           if(-not(Test-Path $setup) -or (Get-Item $setup).Length -lt 150000000){throw "Installer missing application payload"}
           Get-FileHash -Path $setup -Algorithm SHA256 | Format-List | Out-String | Tee-Object -FilePath installer-setup-sha256.log
       - name: REAL user-level Windows acceptance — install, GUI open, same-version upgrade, uninstall, project data retained
+        timeout-minutes: 8
         run: |
           ./ci/test-installer.ps1
           if(-not(Test-Path installer-windows-qa.log)){throw 'Real installer tests did not emit report'}
