@@ -1,0 +1,249 @@
+<Window x:Class="KentroWpf.MainWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
+ Title="Κέντρο Προγραμματισμού · WPF"
+ Width="1180" Height="780" MinWidth="780" MinHeight="540"
+ WindowStartupLocation="CenterScreen" Background="#061724" Foreground="#F5FAFF"
+ FontFamily="Segoe UI" UseLayoutRounding="True" SnapsToDevicePixels="True"
+ TextOptions.TextRenderingMode="ClearType"
+ TextOptions.TextFormattingMode="Display"
+ TextOptions.TextHintingMode="Fixed">
+ <Window.Resources>
+  <LinearGradientBrush x:Key="CardGradient" StartPoint="0,0" EndPoint="0,1">
+   <GradientStop Color="#174461" Offset="0"/>
+   <GradientStop Color="#0B263E" Offset="1"/>
+  </LinearGradientBrush>
+  <LinearGradientBrush x:Key="HeaderGradient" StartPoint="0,0" EndPoint="0,1">
+   <GradientStop Color="#154D74" Offset="0"/>
+   <GradientStop Color="#071A2A" Offset="1"/>
+  </LinearGradientBrush>
+  <LinearGradientBrush x:Key="ButtonGradient" StartPoint="0,0" EndPoint="0,1">
+   <GradientStop Color="#239FE0" Offset="0"/>
+   <GradientStop Color="#08629A" Offset="1"/>
+  </LinearGradientBrush>
+  <LinearGradientBrush x:Key="SecondaryGradient" StartPoint="0,0" EndPoint="0,1">
+   <GradientStop Color="#1A567C" Offset="0"/>
+   <GradientStop Color="#0B304F" Offset="1"/>
+  </LinearGradientBrush>
+  <Style x:Key="Panel" TargetType="Border">
+   <Setter Property="Background" Value="{StaticResource CardGradient}"/>
+   <Setter Property="CornerRadius" Value="12"/>
+   <Setter Property="BorderBrush" Value="#387BA3"/>
+   <Setter Property="BorderThickness" Value="1"/>
+   <Setter Property="Padding" Value="17"/>
+   <Setter Property="SnapsToDevicePixels" Value="True"/>
+  </Style>
+  <Style x:Key="UiButton" TargetType="Button">
+   <Setter Property="Background" Value="{StaticResource SecondaryGradient}"/>
+   <Setter Property="Foreground" Value="#F5FAFF"/>
+   <Setter Property="BorderBrush" Value="#3C94C2"/>
+   <Setter Property="BorderThickness" Value="1"/>
+   <Setter Property="FontSize" Value="14"/>
+   <Setter Property="FontWeight" Value="SemiBold"/>
+   <Setter Property="Height" Value="48"/>
+   <Setter Property="Padding" Value="8"/>
+   <Setter Property="Cursor" Value="Hand"/>
+   <Setter Property="HorizontalContentAlignment" Value="Center"/>
+   <Setter Property="Template">
+    <Setter.Value>
+     <ControlTemplate TargetType="Button">
+      <Border x:Name="ButtonBorder" Background="{TemplateBinding Background}"
+       BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+       CornerRadius="9" SnapsToDevicePixels="True">
+       <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+        RecognizesAccessKey="True" Margin="{TemplateBinding Padding}"/>
+      </Border>
+      <ControlTemplate.Triggers>
+       <Trigger Property="IsMouseOver" Value="True">
+        <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#B5E6FF"/>
+       </Trigger>
+       <Trigger Property="IsPressed" Value="True">
+        <Setter TargetName="ButtonBorder" Property="Background" Value="#074D82"/>
+       </Trigger>
+       <Trigger Property="IsEnabled" Value="False">
+        <Setter Property="Foreground" Value="#96AABC"/>
+        <Setter TargetName="ButtonBorder" Property="Background" Value="#183147"/>
+        <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#355773"/>
+       </Trigger>
+      </ControlTemplate.Triggers>
+     </ControlTemplate>
+    </Setter.Value>
+   </Setter>
+  </Style>
+  <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource UiButton}">
+   <Setter Property="Background" Value="{StaticResource ButtonGradient}"/>
+  </Style>
+  <Style x:Key="Headline" TargetType="TextBlock">
+   <Setter Property="Foreground" Value="#F5FAFF"/>
+   <Setter Property="FontWeight" Value="Bold"/>
+   <Setter Property="TextWrapping" Value="Wrap"/>
+  </Style>
+  <Style x:Key="Info" TargetType="TextBlock">
+   <Setter Property="Foreground" Value="#C5D9E7"/>
+   <Setter Property="TextWrapping" Value="Wrap"/>
+  </Style>
+ </Window.Resources>
+ <Grid>
+  <Grid.RowDefinitions>
+   <RowDefinition Height="108"/>
+   <RowDefinition Height="*"/>
+   <RowDefinition Height="35"/>
+  </Grid.RowDefinitions>
+  <Border Grid.Row="0" BorderBrush="#3E84AE" BorderThickness="0,0,0,1"
+   Background="{StaticResource HeaderGradient}" Padding="24,13">
+   <DockPanel LastChildFill="True">
+    <Border DockPanel.Dock="Left" Background="{StaticResource ButtonGradient}" Width="65" Height="65"
+      CornerRadius="12" BorderThickness="1.5" BorderBrush="#93DDFF" Margin="0,0,18,0">
+     <TextBlock Text="ΚΠ" FontSize="26" FontWeight="Bold"
+      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    </Border>
+    <StackPanel VerticalAlignment="Center">
+     <TextBlock Text="ΚΕΝΤΡΟ ΠΡΟΓΡΑΜΜΑΤΙΣΜΟΥ" FontSize="27"
+      FontWeight="Bold" Foreground="#F6FAFF"/>
+     <TextBlock Text="ΤΟΠΙΚΗ ΑΝΑΠΤΥΞΗ ΠΡΟΓΡΑΜΜΑΤΩΝ   •   ΕΛΕΓΧΟΙ   •   EXE   •   ΕΚΔΟΣΕΙΣ"
+      FontSize="12.5" FontWeight="SemiBold" Foreground="#B9DCEE" Margin="0,6,0,0"
+      TextWrapping="Wrap"/>
+    </StackPanel>
+   </DockPanel>
+  </Border>
+  <Grid Grid.Row="1" Margin="14,12,14,9">
+   <Grid.ColumnDefinitions>
+    <ColumnDefinition Width="288"/>
+    <ColumnDefinition Width="13"/>
+    <ColumnDefinition Width="*"/>
+   </Grid.ColumnDefinitions>
+   <Border Grid.Column="0" Style="{StaticResource Panel}">
+    <Grid>
+     <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+     </Grid.RowDefinitions>
+     <StackPanel Margin="0,0,0,14">
+      <TextBlock Text="ΤΑ ΠΡΟΓΡΑΜΜΑΤΑ ΜΟΥ" FontSize="18" Style="{StaticResource Headline}"/>
+      <TextBlock Name="CounterText" Text="0 ΕΡΓΑ" Foreground="#53B8FB" FontSize="13"
+       FontWeight="SemiBold" Margin="0,5,0,0"/>
+     </StackPanel>
+     <ListBox Name="ProjectsList" Grid.Row="1" Background="#092C43"
+      BorderBrush="#326C91" BorderThickness="1" Foreground="#F3F9FE"
+      SelectionChanged="Projects_SelectionChanged" Padding="2">
+      <ListBox.ItemTemplate>
+       <DataTemplate>
+        <StackPanel Margin="7,8">
+         <TextBlock Text="{Binding Name}" TextWrapping="Wrap" FontSize="15"
+          FontWeight="SemiBold" Foreground="#F5FAFF"/>
+         <TextBlock Text="{Binding Info}" TextWrapping="Wrap" FontSize="12"
+          Foreground="#BDD9EA" Margin="0,4,0,0"/>
+        </StackPanel>
+       </DataTemplate>
+      </ListBox.ItemTemplate>
+     </ListBox>
+     <StackPanel Grid.Row="2" Margin="0,12,0,0">
+      <Button Name="ImportButton" Content="ΕΙΣΑΓΩΓΗ ΠΡΟΓΡΑΜΜΑΤΟΣ ZIP"
+       Style="{StaticResource PrimaryButton}" Click="Import_Click" Margin="0,0,0,8"/>
+      <Button Name="ReloadButton" Content="ΑΝΑΝΕΩΣΗ ΛΙΣΤΑΣ"
+       Style="{StaticResource UiButton}" Click="Reload_Click" Margin="0,0,0,8"/>
+      <Button Name="RestoreButton" Content="ΕΠΑΝΑΦΟΡΑ ΑΦΑΙΡΕΜΕΝΟΥ"
+       Style="{StaticResource UiButton}" Click="Restore_Click" Margin="0,0,0,8"/>
+      <Button Name="TrashButton" Content="ΑΦΑΙΡΕΣΗ"
+       Style="{StaticResource UiButton}" Click="Trash_Click"/>
+     </StackPanel>
+    </Grid>
+   </Border>
+   <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto"
+    HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0">
+    <StackPanel>
+     <Border Style="{StaticResource Panel}" Margin="0,0,0,13">
+      <StackPanel>
+       <TextBlock Text="ΕΠΙΛΕΓΜΕΝΟ ΠΡΟΓΡΑΜΜΑ" FontSize="14"
+        Style="{StaticResource Headline}"/>
+       <TextBlock Name="ProjectNameText" Text="Δεν έχει επιλεγεί πρόγραμμα"
+        FontSize="24" FontWeight="Bold" TextWrapping="Wrap" Margin="0,7,0,7"/>
+       <TextBlock Name="ProjectInfoText" Text="Εισάγετε ZIP για να ξεκινήσετε."
+        Style="{StaticResource Info}" FontSize="13"/>
+      </StackPanel>
+     </Border>
+     <primitives:UniformGrid Name="Phases" Columns="4" Margin="0,0,0,13">
+      <Border Style="{StaticResource Panel}" Margin="0,0,8,0" Padding="11">
+       <StackPanel>
+        <TextBlock Text="01" FontSize="19" FontWeight="Bold" Foreground="#56B8F4"/>
+        <TextBlock Text="ΕΛΕΓΧΟΙ" FontSize="15" FontWeight="Bold" Margin="0,6,0,4"/>
+        <TextBlock Text="Έλεγχοι και δοκιμές πίεσης" FontSize="12"
+         Foreground="#C1D9E8" TextWrapping="Wrap" MinHeight="48"/>
+        <Button Name="TestButton" Content="ΕΛΕΓΧΟΙ" Style="{StaticResource PrimaryButton}"
+         Click="Checks_Click"/>
+       </StackPanel>
+      </Border>
+      <Border Style="{StaticResource Panel}" Margin="0,0,8,0" Padding="11">
+       <StackPanel>
+        <TextBlock Text="02" FontSize="19" FontWeight="Bold" Foreground="#56B8F4"/>
+        <TextBlock Text="ΑΝΑΦΟΡΑ" FontSize="15" FontWeight="Bold" Margin="0,6,0,4"/>
+        <TextBlock Text="Αναλυτικά αποτελέσματα" FontSize="12"
+         Foreground="#C1D9E8" TextWrapping="Wrap" MinHeight="48"/>
+        <Button Name="ReportButton" Content="ΑΝΑΦΟΡΑ" Style="{StaticResource UiButton}"
+         Click="Report_Click"/>
+       </StackPanel>
+      </Border>
+      <Border Style="{StaticResource Panel}" Margin="0,0,8,0" Padding="11">
+       <StackPanel>
+        <TextBlock Text="03" FontSize="19" FontWeight="Bold" Foreground="#56B8F4"/>
+        <TextBlock Text="ΚΑΤΑΣΚΕΥΗ EXE" FontSize="15" FontWeight="Bold" Margin="0,6,0,4"
+         TextWrapping="Wrap"/>
+        <TextBlock Text="Μόνο μετά τους ελέγχους" FontSize="12"
+         Foreground="#C1D9E8" TextWrapping="Wrap" MinHeight="48"/>
+        <Button Name="BuildButton" Content="EXE" Style="{StaticResource PrimaryButton}"
+         Click="Build_Click"/>
+       </StackPanel>
+      </Border>
+      <Border Style="{StaticResource Panel}" Padding="11">
+       <StackPanel>
+        <TextBlock Text="04" FontSize="19" FontWeight="Bold" Foreground="#56B8F4"/>
+        <TextBlock Text="SETUP" FontSize="15" FontWeight="Bold" Margin="0,6,0,4"/>
+        <TextBlock Text="Προαιρετική εγκατάσταση" FontSize="12"
+         Foreground="#C1D9E8" TextWrapping="Wrap" MinHeight="48"/>
+        <Button Name="SetupButton" Content="SETUP" Style="{StaticResource UiButton}"
+         Click="Setup_Click"/>
+       </StackPanel>
+      </Border>
+     </primitives:UniformGrid>
+     <Border Style="{StaticResource Panel}" MinHeight="250">
+      <Grid>
+       <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*" MinHeight="140"/>
+        <RowDefinition Height="Auto"/>
+       </Grid.RowDefinitions>
+       <TextBlock Text="Αποτελέσματα εργασίας" FontSize="18"
+        Style="{StaticResource Headline}"/>
+       <TextBlock Name="StageText" Grid.Row="1"
+        Text="Επόμενο βήμα: λειτουργικοί έλεγχοι και stress tests"
+        FontSize="13" Foreground="#B9D7E9" Margin="0,5,0,7"
+        TextWrapping="Wrap"/>
+       <ProgressBar Name="Progress" Grid.Row="2" Height="5" IsIndeterminate="True"
+        Visibility="Collapsed" Margin="0,0,0,6"/>
+       <ListBox Name="ResultsList" Grid.Row="3" Background="#071F33"
+        BorderBrush="#2E6387" BorderThickness="1" Foreground="#EAF6FF"
+        FontSize="13" Padding="8"/>
+       <Grid Grid.Row="4" Margin="0,12,0,0">
+        <Grid.ColumnDefinitions>
+         <ColumnDefinition Width="*"/>
+         <ColumnDefinition Width="12"/>
+         <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Button Name="FolderButton" Grid.Column="0" Content="ΦΑΚΕΛΟΣ ΠΡΟΓΡΑΜΜΑΤΟΣ"
+         Style="{StaticResource UiButton}" Click="Folder_Click"/>
+        <Button Name="StopButton" Grid.Column="2" Content="ΑΚΥΡΩΣΗ"
+         Style="{StaticResource UiButton}" Click="Stop_Click"/>
+       </Grid>
+      </Grid>
+     </Border>
+    </StackPanel>
+   </ScrollViewer>
+  </Grid>
+  <TextBlock Grid.Row="2" Name="StatusText" FontSize="12" Foreground="#B5D2E5"
+   Margin="20,8,0,0" Text="Τοπική εργασία · Χωρίς εξάρτηση από GitHub"/>
+ </Grid>
+</Window>
