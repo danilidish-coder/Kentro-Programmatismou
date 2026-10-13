@@ -1,0 +1,94 @@
+<Window x:Class="KentroOffline.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Κέντρο Προγραμματισμού — Αυτόνομο Εργαστήριο" Height="840" Width="1380" MinWidth="1100" MinHeight="700" WindowStartupLocation="CenterScreen" Background="{StaticResource BackgroundBrush}" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" UseLayoutRounding="True">
+ <DockPanel LastChildFill="True">
+  <Border DockPanel.Dock="Top" Background="#123D5A" Padding="19,15">
+   <StackPanel>
+    <TextBlock Text="ΚΕΝΤΡΟ ΠΡΟΓΡΑΜΜΑΤΙΣΜΟΥ" FontSize="25" FontWeight="Bold"/>
+    <TextBlock Text="ΑΥΤΟΝΟΜΟ WINDOWS ΕΡΓΑΣΤΗΡΙΟ · ΕΡΓΑ · ΚΩΔΙΚΑΣ · ΕΛΕΓΧΟΙ · EXE · ΙΣΤΟΡΙΚΟ" FontSize="12" Foreground="{StaticResource MutedBrush}"/>
+   </StackPanel>
+  </Border>
+  <Border DockPanel.Dock="Bottom" Background="#082236" Padding="12,9">
+   <TextBlock x:Name="StatusLabel" Text="Έτοιμο · Τοπική λειτουργία · Δεν απαιτείται σύνδεση GitHub" FontSize="12"/>
+  </Border>
+  <Grid Margin="10">
+   <Grid.ColumnDefinitions>
+    <ColumnDefinition Width="265"/><ColumnDefinition Width="*"/>
+   </Grid.ColumnDefinitions>
+   <Border Background="{StaticResource CardBrush}" CornerRadius="9" Padding="11" Margin="0,0,9,0">
+    <DockPanel LastChildFill="True">
+     <StackPanel DockPanel.Dock="Top">
+      <TextBlock Text="ΤΑ ΕΡΓΑ ΜΟΥ" FontWeight="Bold" FontSize="18" Margin="5,5,0,12"/>
+      <Button x:Name="ImportButton" Content="ΕΙΣΑΓΩΓΗ ZIP" Click="Import_Click"/>
+      <Button x:Name="NewProjectButton" Content="ΝΕΟ ΠΡΟΓΡΑΜΜΑ" Click="NewProject_Click"/>
+      <Button x:Name="ReloadButton" Content="ΑΝΑΝΕΩΣΗ" Click="Reload_Click"/>
+     </StackPanel>
+     <StackPanel DockPanel.Dock="Bottom">
+      <Button x:Name="FolderButton" Content="ΑΝΟΙΓΜΑ ΦΑΚΕΛΟΥ ΕΡΓΟΥ" Click="Folder_Click"/>
+      <Button x:Name="RuntimeButton" Content="ΕΛΕΓΧΟΣ ΕΡΓΑΛΕΙΩΝ" Click="Runtime_Click"/>
+      <TextBlock Text="Όλα τα έργα και οι εκδόσεις αποθηκεύονται στον υπολογιστή." TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="7,13,3,5"/>
+     </StackPanel>
+     <ListBox x:Name="ProjectList" SelectionChanged="Project_Changed" Margin="3,12,3,8" DisplayMemberPath="Title"/>
+    </DockPanel>
+   </Border>
+   <Grid Grid.Column="1">
+    <Grid.RowDefinitions>
+     <RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="200"/>
+    </Grid.RowDefinitions>
+    <Border Background="{StaticResource CardBrush}" CornerRadius="9" Margin="0,0,0,9" Padding="14">
+     <StackPanel>
+      <TextBlock x:Name="ProjectTitle" Text="Επιλέξτε ή εισαγάγετε πρόγραμμα" FontSize="19" FontWeight="Bold"/>
+      <TextBlock x:Name="ProjectSubtitle" Text="Χωρίς εξωτερικά εργαλεία, όταν χρησιμοποιείται ενσωματωμένη γλώσσα." Margin="0,5,0,0" Foreground="{StaticResource MutedBrush}"/>
+     </StackPanel>
+    </Border>
+    <TabControl x:Name="Tabs" Grid.Row="1" Background="{StaticResource CardBrush}" Foreground="#EDF8FF" BorderBrush="#417DA4">
+     <TabItem Header="ΚΩΔΙΚΑΣ / ΑΡΧΕΙΑ">
+      <Grid Margin="9">
+       <Grid.ColumnDefinitions><ColumnDefinition Width="290"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+       <DockPanel>
+        <StackPanel DockPanel.Dock="Bottom"><Button Content="ΝΕΟ ΑΡΧΕΙΟ" Click="NewFile_Click"/><Button Content="ΑΠΟΘΗΚΕΥΣΗ" Click="SaveFile_Click"/></StackPanel>
+        <ListBox x:Name="FileList" SelectionChanged="File_Changed"/>
+       </DockPanel>
+       <DockPanel Grid.Column="1" Margin="8,0,0,0">
+        <TextBlock x:Name="FileNameLabel" DockPanel.Dock="Top" Text="Επιλέξτε αρχείο" Margin="4,3,0,7"/>
+        <TextBox x:Name="CodeEditor" FontFamily="Consolas" FontSize="13" AcceptsReturn="True" AcceptsTab="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" TextWrapping="No"/>
+       </DockPanel>
+      </Grid>
+     </TabItem>
+     <TabItem Header="ΔΟΚΙΜΕΣ / ΕΛΕΓΧΟΙ">
+      <Grid Margin="9">
+       <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+       <WrapPanel>
+        <Button x:Name="TestButton" Content="ΕΚΤΕΛΕΣΗ ΟΛΩΝ ΤΩΝ ΕΛΕΓΧΩΝ" Click="Tests_Click"/>
+        <Button x:Name="ReportButton" Content="ΕΞΑΓΩΓΗ ΑΝΑΦΟΡΑΣ" Click="Report_Click"/>
+        <Button x:Name="ReviewButton" Content="ΦΟΡΤΩΣΗ ΕΓΚΡΙΣΗΣ CHATGPT" Click="Review_Click"/>
+        <Button x:Name="BuildButton" Content="ΚΑΤΑΣΚΕΥΗ EXE" Click="Build_Click"/>
+        <Button x:Name="CancelButton" Content="ΑΚΥΡΩΣΗ" Click="Cancel_Click"/>
+       </WrapPanel>
+       <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="360"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <DockPanel><TextBlock Text="ΣΧΕΔΙΟ TEST / STRESS" DockPanel.Dock="Top" FontWeight="Bold" Margin="4,10,4,6"/><ListBox x:Name="PlanList" FontFamily="Consolas" FontSize="12"/></DockPanel>
+        <DockPanel Grid.Column="1" Margin="9,0,0,0"><TextBlock Text="ΑΠΟΤΕΛΕΣΜΑΤΑ / ΙΣΤΟΡΙΚΟ" DockPanel.Dock="Top" FontWeight="Bold" Margin="4,10,4,6"/><ListBox x:Name="RunList" SelectionChanged="Run_Changed"/></DockPanel>
+       </Grid>
+      </Grid>
+     </TabItem>
+     <TabItem Header="ΕΚΔΟΣΕΙΣ / ΕΠΑΝΑΦΟΡΑ">
+      <DockPanel Margin="9">
+       <WrapPanel DockPanel.Dock="Top">
+        <Button x:Name="SnapshotButton" Content="ΑΠΟΘΗΚΕΥΣΗ ΕΚΔΟΣΗΣ" Click="Snapshot_Click"/>
+        <Button x:Name="CompareButton" Content="ΣΥΓΚΡΙΣΗ ΑΛΛΑΓΩΝ" Click="Compare_Click"/>
+        <Button x:Name="RestoreButton" Content="ΕΠΑΝΑΦΟΡΑ ΕΚΔΟΣΗΣ" Click="Restore_Click"/>
+        <Button x:Name="ReleaseFolderButton" Content="ΦΑΚΕΛΟΣ EXE" Click="ReleaseFolder_Click"/>
+       </WrapPanel>
+       <ListBox x:Name="SnapshotList" SelectionChanged="Snapshot_Changed"/>
+      </DockPanel>
+     </TabItem>
+     <TabItem Header="ΒΟΗΘΕΙΑ">
+      <ScrollViewer Margin="12"><TextBlock TextWrapping="Wrap" FontSize="14" Text="Το Κέντρο λειτουργεί τοπικά. Διαθέτει φορητή Python, Go και .NET SDK που συμπεριλαμβάνονται στην εφαρμογή. Δεν απαιτείται GitHub ή εγκατάσταση εργαλείων από εσάς.&#10;&#10;1. Εισάγετε ZIP με πηγαίο κώδικα και project-manifest.json.&#10;2. Δείτε ή διορθώστε τα αρχεία και αποθηκεύστε έκδοση.&#10;3. Εκτελέστε ελέγχους και stress tests.&#10;4. Στείλτε στο ChatGPT την αναφορά ZIP.&#10;5. Μετά από έγκριση, φορτώστε το μικρό JSON έγκρισης.&#10;6. Κατασκευάστε το EXE και θα εμφανιστεί στις τοπικές εκδόσεις.&#10;&#10;Για πρόσθετες εξαρτήσεις που δεν υπάρχουν στο ενσωματωμένο πακέτο, απαιτούνται κατάλληλα αρχεία/πακέτα διαθέσιμα εκτός σύνδεσης. Το Κέντρο δεν αποκρύπτει ελλείψεις.&#10;&#10;Κάθε έργο έχει ανεξάρτητο ιστορικό, εκδόσεις, αναφορές και αντίγραφα. Το πρόγραμμα δεν διαγράφει δεδομένα άλλων εφαρμογών."/></ScrollViewer>
+     </TabItem>
+    </TabControl>
+    <DockPanel Grid.Row="2" Margin="0,9,0,0">
+     <TextBlock Text="ΖΩΝΤΑΝΗ ΚΑΤΑΓΡΑΦΗ ΕΡΓΑΣΙΩΝ" DockPanel.Dock="Top" FontWeight="Bold" Margin="5,0,0,7"/>
+     <TextBox x:Name="LogBox" IsReadOnly="True" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AcceptsReturn="True"/>
+    </DockPanel>
+   </Grid>
+  </Grid>
+ </DockPanel>
+</Window>

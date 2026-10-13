@@ -1,0 +1,99 @@
+name: NEW Offline Studio V2 — real Windows acceptance, portable toolchains and standalone EXE
+on:
+  push:
+    branches: [rewrite/offline-studio-v2]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  complete_windows_validation:
+    name: Offline Python / Go / .NET / Node + WPF + real EXE build
+    runs-on: windows-2022
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout fresh standalone source
+        uses: actions/checkout@v4
+      - name: Setup Python for packaging portable interpreter
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Setup Go for packaging portable compiler
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+      - name: Setup .NET SDK for WPF and offline build
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Setup Node for offline JavaScript testing
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned Python build and project dependencies INTO bundled interpreter
+        run: |
+          python -m pip install --no-cache-dir --disable-pip-version-check "PyInstaller==6.16.0" "PySide6==6.9.3" "python-docx==1.2.0" "openpyxl==3.1.5" "Pillow==11.3.0" "pytest==8.4.2" "psutil==7.1.0" "requests==2.32.5"
+          if($LASTEXITCODE -ne 0){throw 'Bundled Python libraries unavailable'}
+          python -c "import PySide6.QtWidgets,PyInstaller,openpyxl,docx,PIL,pytest;print('ALL_PYTHON_PACKAGES_PRESENT')"
+          if($LASTEXITCODE -ne 0){throw 'Missing bundled Python library'}
+      - name: Package complete portable toolchains within application (no admin / no internet at user PC)
+        run: |
+          ./ci/package-runtime.ps1
+      - name: Build new WPF desktop application as one self-contained EXE
+        run: |
+          dotnet publish Studio/Studio.csproj -c Release -r win-x64 --self-contained true --output publish /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true /p:EnableCompressionInSingleFile=true 2>&1 | Tee-Object studio-build.log
+          if($LASTEXITCODE -ne 0){throw 'WPF compile failed'}
+          $files=Get-ChildItem publish -File
+          $exe=Join-Path (Resolve-Path publish) 'Kentro_Programmatismou.exe'
+          if(-not (Test-Path $exe) -or (Get-Item $exe).Length -lt 150000000){throw 'Toolchain payload missing from EXE'}
+          "FILE_COUNT=$($files.Count)" | Add-Content studio-build.log
+          "EXE_SIZE=$((Get-Item $exe).Length)" | Add-Content studio-build.log
+      - name: REAL OFFLINE acceptance — fresh extraction, bundled libraries, GUI, code versions, parallel and sequential tests, approval gate and PySide6 EXE
+        run: |
+          $ErrorActionPreference='Stop'
+          $success=Join-Path $env:TEMP 'kentro-v2-ci-success.txt'
+          $failure=Join-Path $env:TEMP 'kentro-v2-ci-failure.txt'
+          Remove-Item $success,$failure -Force -ErrorAction SilentlyContinue
+          $env:PIP_NO_INDEX='1'
+          $env:GOPROXY='off'
+          $env:DOTNET_CLI_TELEMETRY_OPTOUT='1'
+          $proc=Start-Process -FilePath (Resolve-Path 'publish/Kentro_Programmatismou.exe') -ArgumentList '--ci-selftest' -PassThru -Wait -WorkingDirectory (Resolve-Path 'publish')
+          if(Test-Path $failure){Get-Content $failure | Tee-Object -FilePath studio-qa-failure.log}
+          if(Test-Path (Join-Path $env:TEMP 'kentro-v2-ci-results.log')) {
+            Copy-Item (Join-Path $env:TEMP 'kentro-v2-ci-results.log') studio-qa-results.log
+            Get-Content studio-qa-results.log | Select-Object -Last 90
+          }
+          if($proc.ExitCode -ne 0 -or -not(Test-Path $success)){throw "Real local WPF acceptance failed: exit=$($proc.ExitCode)"}
+          Get-Content $success
+          Copy-Item (Join-Path $env:TEMP 'kentro-v2-wpf.png') studio-wpf.png
+          if((Get-Item studio-wpf.png).Length -lt 10000){throw 'WPF screenshot not captured'}
+      - name: Recheck no outside toolchain used during actual local acceptance
+        run: |
+          $log=Get-Content studio-qa-results.log -Raw
+          foreach($word in @('Bundled Python dependencies','Bundled .NET SDK','Bundled Go compiler','Parallel and sequential stress','Exact synthetic reviewer decision','Real PyInstaller onefile EXE','Local history detects actual file changes','Unsafe ZIP traversal')){
+            if(-not($log.Contains($word))){throw "Missing Windows acceptance proof: $word"}
+          }
+          "Windows acceptance markers PASS" | Tee-Object -FilePath studio-final-verification.log
+      - name: Upload detailed diagnostics for audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-studio-v2-windows-qa
+          path: |
+            studio-build.log
+            studio-qa-results.log
+            studio-qa-failure.log
+            studio-wpf.png
+            studio-final-verification.log
+            runtime-package.log
+          if-no-files-found: warn
+      - name: Publish ONE verified offline Studio EXE as test prerelease
+        if: success() && github.ref == 'refs/heads/rewrite/offline-studio-v2'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $sha="${{ github.sha }}".Substring(0,12)
+          $tag="offline-studio-v2-test-$sha"
+          gh release create $tag './publish/Kentro_Programmatismou.exe' --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "Κέντρο Προγραμματισμού · αυτόνομο v2 · $sha" --notes "Δοκιμαστική καθαρή επανεγγραφή από μηδέν. Περιλαμβάνει φορητά Python/PyInstaller/PySide6, Go, .NET 8 SDK και Node χωρίς ανάγκη εγκατάστασης. Επιβεβαιωμένα Windows acceptance με πραγματικό EXE, WPF GUI, δοκιμές, παρακολούθηση εκδόσεων και χειροκίνητη έγκριση ChatGPT. Ένα EXE. Προηγούμενες υπηρεσιακές εφαρμογές ανέπαφες." --prerelease
