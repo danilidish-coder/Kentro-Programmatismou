@@ -151,7 +151,7 @@
      </StackPanel>
     </Grid>
    </Border>
-   <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto"
+   <ScrollViewer Name="MainScroll" Grid.Column="2" VerticalScrollBarVisibility="Auto"
     HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0">
     <StackPanel>
      <Border Style="{StaticResource Panel}" Margin="0,0,0,13">
