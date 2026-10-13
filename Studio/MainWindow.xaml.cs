@@ -71,6 +71,7 @@ public partial class MainWindow:Window
    var steps=new List<string>();
    foreach(var t in plan.Tests)steps.Add($"TEST [{t.Module}]\n{t.Name}\n{t.Command} {string.Join(' ',t.Args)} · {t.TimeoutSeconds}s");
    foreach(var t in plan.Stress)steps.Add($"STRESS [{t.Module}]\n{t.Name} · {t.Kind}\n{t.Repeats} φορές / {t.Parallel} παράλληλες · {t.TimeoutSeconds}s");
+   foreach(var t in plan.Visual)steps.Add($"VISUAL [{t.Module}]\n{t.Name}\n{t.Command} {string.Join(' ',t.Args)} · {t.TimeoutSeconds}s");
    steps.Add("BUILD\n"+plan.Build?.Name+"\n"+plan.Build?.Command+" "+string.Join(' ',plan.Build?.Args??new List<string>()));
    steps.Add("SMOKE\n"+plan.Smoke?.Name);
    PlanList.ItemsSource=steps;

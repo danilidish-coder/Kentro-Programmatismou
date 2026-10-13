@@ -39,6 +39,11 @@ public static class Qa
   Require(Workspace.ReadPlan(project.Id).Tests.Count>0,"New project has valid runnable plan");
   string source=Workspace.SourceOf(project.Id);
   var plan=Workspace.ReadPlan(project.Id);
+  plan.Visual.Add(new Step{
+   Name="Synthetic GUI visual gate",Module="VISUAL",
+   Command="python",Args=new(){"-c","print('VISUAL_ACCEPTED')"},
+   TimeoutSeconds=60,ExpectContains="VISUAL_ACCEPTED"
+  });
   plan.Stress.Add(new Stress{
    Name="Parallel isolated stress",Module="ISOLATION",Kind="parallel",
    Command="python",Args=new(){"tests.py"},Repeats=6,Parallel=3,TimeoutSeconds=60});
@@ -115,6 +120,8 @@ public static class Qa
    "Real PyInstaller onefile EXE built with BUNDLED runtime on Windows");
   Require(binary.Results.Any(x=>x.Phase=="SMOKE"&&x.Status=="PASS"),
    "Real desktop GUI executable launched and remained open");
+  Require(binary.Results.Any(x=>x.Phase=="VISUAL"&&x.Status=="PASS"),
+   "Mandatory post-build visual test actually executes before EXE approval");
   Require(binary.BinarySha256==Workspace.HashFile(binary.BinaryFile),"Built binary SHA256 matches");
 
   // Verify immutable local version history and safe pre-restore backup.

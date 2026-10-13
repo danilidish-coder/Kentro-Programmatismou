@@ -24,10 +24,15 @@ public static class Toolchains
  public static bool IsReady=>File.Exists(Path.Combine(BaseDir,"READY.ok")) &&
   File.Exists(Python)&&File.Exists(Go)&&File.Exists(Dotnet)&&File.Exists(Node);
 
- public static async Task EnsureAsync(Action<string>? report=null,CancellationToken cancel=default)
+ public static Task EnsureAsync(Action<string>? report=null,CancellationToken cancel=default)
  {
-  if(IsReady)return;
-  await Semaphore.WaitAsync(cancel);
+  if(IsReady)return Task.CompletedTask;
+  // Extract off the UI thread; otherwise the first click would freeze WPF.
+  return Task.Run(()=>EnsureBlocking(report,cancel),cancel);
+ }
+ private static void EnsureBlocking(Action<string>? report,CancellationToken cancel)
+ {
+  Semaphore.Wait(cancel);
   try{
    if(IsReady)return;
    Directory.CreateDirectory(Path.GetDirectoryName(BaseDir)!);

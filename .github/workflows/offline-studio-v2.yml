@@ -47,7 +47,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: Studio/Assets/toolchains.zip
-          key: studio-v2-portable-py312-go125-dotnet8-node22-20261013-b
+          key: studio-v2-portable-py312-go125-dotnet8-node22-20261013-c
       - name: Package complete portable toolchains within application (no admin / no internet at user PC)
         if: steps.tools-cache.outputs.cache-hit != 'true'
         run: |
@@ -57,7 +57,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: Studio/Assets/toolchains.zip
-          key: studio-v2-portable-py312-go125-dotnet8-node22-20261013-b
+          key: studio-v2-portable-py312-go125-dotnet8-node22-20261013-c
       - name: Build new WPF desktop application as one self-contained EXE
         run: |
           dotnet publish Studio/Studio.csproj -c Release -r win-x64 --self-contained true --output publish /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true /p:EnableCompressionInSingleFile=true 2>&1 | Tee-Object studio-build.log

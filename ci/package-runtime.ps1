@@ -38,7 +38,7 @@ foreach($part in @(
  'packs/NETStandard.Library.Ref/*'
 )){
  $items=Get-Item (Join-Path $dotnetHome $part) -ErrorAction SilentlyContinue
- foreach($item in ($items | Sort-Object FullName -Descending | Select-Object -First 1)){
+ foreach($item in ($items | Sort-Object -Property @{Expression={[version]$_.Name}} -Descending | Select-Object -First 1)){
   $rel=$item.FullName.Substring($dotnetHome.Length).TrimStart('\','/')
   CopyAll $item.FullName (Join-Path $dest $rel)
  }

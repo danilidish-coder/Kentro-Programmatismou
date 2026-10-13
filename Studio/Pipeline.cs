@@ -340,6 +340,31 @@ public static class Pipeline
   return res;
  }
 
+ private static TestResult CheckVisualEvidence(string root,TestResult result,Step step)
+ {
+  // Visual-flicker script may exit 0 even when it detects regressions.
+  if(!step.Args.Any(a=>a.EndsWith("visual_flicker_windows.py",StringComparison.OrdinalIgnoreCase)))
+   return result;
+  string evidence=Path.Combine(root,"visual_checks","report.json");
+  if(!File.Exists(evidence)){
+   result.Status="FAIL";result.Category="VISUAL_EVIDENCE";
+   result.Reason="Το οπτικό τεστ δεν παρήγαγε visual_checks/report.json";
+   return result;
+  }
+  try{
+   using var doc=JsonDocument.Parse(File.ReadAllText(evidence));
+   var rootDoc=doc.RootElement;
+   int Count(string key)=>rootDoc.TryGetProperty(key,out var v)&&v.TryGetInt32(out int n)?n:0;
+   if(Count("startup_endpoint_flicker_runs")>0||
+      Count("theme_endpoint_flicker_toggles")>0||
+      Count("theme_clicks_confirmed")<1){
+    result.Status="FAIL";result.Category="VISUAL_REGRESSION";
+    result.Reason=$"Τρεμόπαιγμα κατά την εκκίνηση: {Count("startup_endpoint_flicker_runs")}, αλλαγές θέματος: {Count("theme_endpoint_flicker_toggles")}, επιβεβαιωμένα κλικ: {Count("theme_clicks_confirmed")}";
+   }
+  }catch(Exception ex){result.Status="FAIL";result.Category="VISUAL_EVIDENCE";result.Reason=ex.Message;}
+  return result;
+ }
+
  public static async Task<RunRecord> BuildAsync(string id,Action<string>? progress,CancellationToken token=default)
  {
   await Exclusive.WaitAsync(token);
@@ -364,6 +389,13 @@ public static class Pipeline
      var tested=await GUIStartupAsync(smoke,copy,token,progress);
      record.Results.Add(tested);
      if(tested.Status=="PASS"){
+      for(int i=0;i<plan.Visual.Count;i++){
+       var visual=plan.Visual[i];
+       var vr=await ExecuteAsync(visual,"VISUAL",copy,logDir,"visual-"+i,token,progress);
+       record.Results.Add(CheckVisualEvidence(copy,vr,visual));
+      }
+      if(record.Results.Any(x=>x.Phase=="VISUAL"&&x.Required&&x.Status!="PASS"))
+       throw new InvalidOperationException("Ο υποχρεωτικός οπτικός έλεγχος απέτυχε — το EXE δεν εγκρίνεται");
       string relative=smoke.Command;
       if(!relative.StartsWith("./")||!relative.EndsWith(".exe",StringComparison.OrdinalIgnoreCase))
        throw new InvalidDataException("Το σχέδιο smoke δεν δείχνει παραγόμενο EXE");
