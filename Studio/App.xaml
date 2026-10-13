@@ -27,6 +27,56 @@
      </ControlTemplate></Setter.Value>
    </Setter>
   </Style>
+  <!-- Explicit dark tab headers: native Windows themes may otherwise draw pale
+       header text on a pale selected/unselected tab background. -->
+  <Style TargetType="TabItem">
+   <Setter Property="Background" Value="#153B57"/>
+   <Setter Property="Foreground" Value="#F8FBFF"/>
+   <Setter Property="BorderBrush" Value="#4B83A8"/>
+   <Setter Property="FontFamily" Value="Segoe UI"/>
+   <Setter Property="FontSize" Value="13"/>
+   <Setter Property="FontWeight" Value="SemiBold"/>
+   <Setter Property="Padding" Value="14,11"/>
+   <Setter Property="Margin" Value="2,0,3,0"/>
+   <Setter Property="Template">
+    <Setter.Value>
+     <ControlTemplate TargetType="TabItem">
+      <Border x:Name="TabHeaderBorder"
+        Background="{TemplateBinding Background}"
+        BorderBrush="{TemplateBinding BorderBrush}"
+        BorderThickness="1,1,1,0"
+        CornerRadius="7,7,0,0"
+        Padding="{TemplateBinding Padding}">
+       <TextBlock x:Name="TabHeaderText"
+         Text="{TemplateBinding Header}"
+         Foreground="{TemplateBinding Foreground}"
+         FontFamily="{TemplateBinding FontFamily}"
+         FontSize="{TemplateBinding FontSize}"
+         FontWeight="{TemplateBinding FontWeight}"
+         TextTrimming="None"
+         TextWrapping="NoWrap"
+         HorizontalAlignment="Center"
+         VerticalAlignment="Center"/>
+      </Border>
+      <ControlTemplate.Triggers>
+       <Trigger Property="IsSelected" Value="True">
+        <Setter TargetName="TabHeaderBorder" Property="Background" Value="#276B92"/>
+        <Setter TargetName="TabHeaderBorder" Property="BorderBrush" Value="#91C7E5"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+       </Trigger>
+       <Trigger Property="IsMouseOver" Value="True">
+        <Setter TargetName="TabHeaderBorder" Property="Background" Value="#245E81"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+       </Trigger>
+       <Trigger Property="IsEnabled" Value="False">
+        <Setter TargetName="TabHeaderBorder" Property="Opacity" Value="0.7"/>
+        <Setter Property="Foreground" Value="#E5EEF4"/>
+       </Trigger>
+      </ControlTemplate.Triggers>
+     </ControlTemplate>
+    </Setter.Value>
+   </Setter>
+  </Style>
   <Style TargetType="TextBox">
    <Setter Property="Background" Value="{StaticResource FieldBrush}"/>
    <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>

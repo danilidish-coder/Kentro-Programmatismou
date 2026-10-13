@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -21,6 +22,60 @@ public static class Qa
   if(!condition)throw new InvalidOperationException("CI FAILED: "+reason);
   _log?.Invoke("PASS: "+reason);
  }
+
+ // Test the actual WPF visual tree for ALL four Greek tab captions.
+ // A screenshot file alone never proves legibility: contrast and measured
+ // layout must pass for selected AND unselected headers.
+ private static double Channel(byte value)
+ {
+  double x=value/255.0;
+  return x<=0.04045?x/12.92:Math.Pow((x+0.055)/1.055,2.4);
+ }
+ private static double Luminance(Color c)=>
+  0.2126*Channel(c.R)+0.7152*Channel(c.G)+0.0722*Channel(c.B);
+ private static double Contrast(Color a,Color b)
+ {
+  double x=Luminance(a),y=Luminance(b);
+  return (Math.Max(x,y)+0.05)/(Math.Min(x,y)+0.05);
+ }
+ private static void VerifyGreekTabHeaders(MainWindow window)
+ {
+  var tabs=window.Tabs;
+  Require(tabs.Items.Count==4,"Exactly four Greek navigation tabs present");
+  string[] names={"ΚΩΔΙΚΑΣ / ΑΡΧΕΙΑ","ΔΟΚΙΜΕΣ / ΕΛΕΓΧΟΙ",
+      "ΕΚΔΟΣΕΙΣ / ΕΠΑΝΑΦΟΡΑ","ΒΟΗΘΕΙΑ"};
+  int checkedHeaders=0;
+  int old=tabs.SelectedIndex;
+  for(int selected=0;selected<names.Length;selected++)
+  {
+   tabs.SelectedIndex=selected;
+   tabs.UpdateLayout();
+   for(int index=0;index<names.Length;index++)
+   {
+    if(tabs.Items[index] is not TabItem item)
+     throw new InvalidOperationException("Tab item not rendered");
+    item.ApplyTemplate();
+    if(item.Template.FindName("TabHeaderText",item) is not TextBlock label)
+     throw new InvalidOperationException("Greek tab label template missing");
+    if(item.Template.FindName("TabHeaderBorder",item) is not Border border)
+     throw new InvalidOperationException("Greek tab border template missing");
+    if(label.Text!=names[index]||label.ActualWidth<10||label.ActualHeight<10)
+     throw new InvalidOperationException("Greek tab label missing/clipped: "+names[index]);
+    if(label.Foreground is not SolidColorBrush foreground ||
+       border.Background is not SolidColorBrush background)
+     throw new InvalidOperationException("Tab header has undefined colors");
+    double ratio=Contrast(foreground.Color,background.Color);
+    if(ratio<4.5)
+     throw new InvalidOperationException($"Tab {names[index]} (selected={selected==index}): contrast {ratio:F2}:1 below 4.5");
+    checkedHeaders++;
+   }
+  }
+  tabs.SelectedIndex=old;
+  tabs.UpdateLayout();
+  Require(checkedHeaders==16,
+   "All four Greek tab captions visible and at least 4.5:1 contrast in every selected/unselected state");
+ }
+
  public static async Task RunAsync()
  {
   Directory.CreateDirectory(Workspace.Root);
@@ -56,9 +111,10 @@ public static class Qa
   var window=new MainWindow();
   window.Show();window.ReloadForQa(project.Id);window.UpdateLayout();
   Require(window.IsProjectDisplayedForQa,"Actual WPF main window binds files and plan");
+  VerifyGreekTabHeaders(window);
   Require(window.VisiblePlansForQa>=4,"Visible project has actual tests, stress and build stages");
   try {
-   int width=1000,height=700;
+   int width=1380,height=840;
    var bmp=new RenderTargetBitmap(width,height,96,96,PixelFormats.Pbgra32);
    bmp.Render(window);
    string screenshot=Path.Combine(Path.GetTempPath(),"kentro-v2-wpf.png");
