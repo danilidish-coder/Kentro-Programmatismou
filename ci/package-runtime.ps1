@@ -56,3 +56,7 @@ $bytes=(Get-Item $out).Length
 Get-ChildItem $root -Directory | ForEach-Object {($_.Name+"="+((Get-ChildItem $_.FullName -Recurse -File | Measure-Object Length -Sum).Sum)) | Add-Content runtime-package.log}
 if($bytes -lt 80000000 -or $bytes -gt 2030000000){throw "Unexpected runtime archive size: $bytes"}
 Get-Content runtime-package.log
+# Release transient staging space before compiling and running acceptance tests.
+Remove-Item $root -Recurse -Force
+# robocopy uses nonzero success codes; never propagate a successful copy as a job failure.
+exit 0
