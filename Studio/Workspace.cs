@@ -12,7 +12,7 @@ using System.Text.Json.Serialization;
 
 namespace KentroOffline;
 
-public sealed class Step
+public class Step
 {
  [JsonPropertyName("name")] public string Name {get;set;}="";
  [JsonPropertyName("module")] public string Module {get;set;}="GENERAL";
@@ -88,7 +88,7 @@ public sealed class RunRecord
  public List<TestResult> Results {get;set;}=new();
  public override string ToString()=>$"{Started.ToLocalTime():dd/MM HH:mm} · {Stage} · {Status} · {Results.Count(x=>x.Status=="PASS")}/{Results.Count}";
 }
-public sealed class ReviewRequest
+public class ReviewRequest
 {
  [JsonPropertyName("schema")] public string Schema {get;set;}="kentro-review-v1";
  [JsonPropertyName("project_id")] public string ProjectId {get;set;}="";
