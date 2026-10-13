@@ -41,28 +41,38 @@ function LaunchInstaller([string] $phase) {
   Require ((Get-FileHash -LiteralPath $installed -Algorithm SHA256).Hash -eq $srcHash) "$phase installed EXE is byte-identical to CI verified executable"
   Require (Test-Path -LiteralPath $shortcut) "$phase Greek desktop shortcut exists"
   Require (Test-Path -LiteralPath $start) "$phase Greek Start Menu shortcut exists"
-  $s = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
-  Require ([IO.Path]::GetFullPath($s.TargetPath) -eq [IO.Path]::GetFullPath($installed)) "$phase desktop shortcut opens newly installed program"
+  # Shortcut target metadata may be blank for Inno-generated links on
+  # some CI runners. Verify by a real shell launch below instead of trusting
+  # WScript.Shell metadata to reject a working shortcut.
   CheckProjects $phase
 }
 try {
   Require (Test-Path -LiteralPath $installer) 'Installer setup EXE exists'
   Require ((Get-Item -LiteralPath $installer).Length -gt 150000000) 'Installer contains complete portable application payload'
   LaunchInstaller 'first-install'
-  # Real GUI from the INSTALLED file, not from build output.
-  $p = Start-Process -FilePath $installed -WorkingDirectory $installedDir -PassThru
-  $ready = $false
-  for($i=0; $i -lt 40; $i++) {
+  # Open the installed application through the REAL desktop shortcut,
+  # exactly as the end user will. Only that proves the shortcut is functional.
+  $beforePids = @(Get-Process -Name Kentro_Programmatismou -ErrorAction SilentlyContinue | ForEach-Object {$_.Id})
+  Start-Process -FilePath $shortcut
+  $p = $null
+  for($i=0; $i -lt 45; $i++) {
     Start-Sleep -Seconds 1
-    $p.Refresh()
-    if($p.HasExited) { break }
-    if($p.MainWindowHandle -ne 0) {$ready=$true;break}
+    $candidates = @(Get-Process -Name Kentro_Programmatismou -ErrorAction SilentlyContinue |
+      Where-Object {$beforePids -notcontains $_.Id})
+    foreach($candidate in $candidates) {
+      if($candidate.MainWindowHandle -ne 0) {$p=$candidate;break}
+    }
+    if($null -ne $p) {break}
   }
-  Require ($ready) 'Installed GUI starts with a real Windows main window'
-  try { $p.CloseMainWindow() | Out-Null } catch {}
+  Require ($null -ne $p) 'Installed GUI starts from Greek desktop shortcut with a real Windows main window'
+  $p.Refresh()
+  $runningPath = (Get-CimInstance Win32_Process -Filter "ProcessId=$($p.Id)").ExecutablePath
+  Require (-not [string]::IsNullOrWhiteSpace($runningPath)) 'Shortcut resolves to a real executable path'
+  Require ([IO.Path]::GetFullPath($runningPath) -eq [IO.Path]::GetFullPath($installed)) 'Shortcut launches exact installed EXE, not old portable copy'
+  try {$p.CloseMainWindow() | Out-Null} catch {}
   Start-Sleep -Seconds 2
   $p.Refresh()
-  if(-not $p.HasExited) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+  if(-not $p.HasExited) {Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue}
   CheckProjects 'after-gui-launch'
 
   LaunchInstaller 'in-place-upgrade'
