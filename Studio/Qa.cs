@@ -15,10 +15,11 @@ namespace KentroOffline;
 // Production cannot generate review approvals automatically.
 public static class Qa
 {
+ private static Action<string>? _log;
  private static void Require(bool condition,string reason)
  {
   if(!condition)throw new InvalidOperationException("CI FAILED: "+reason);
-  Console.WriteLine("PASS: "+reason);
+  _log?.Invoke("PASS: "+reason);
  }
  public static async Task RunAsync()
  {
@@ -26,6 +27,7 @@ public static class Qa
   string report=Path.Combine(Path.GetTempPath(),"kentro-v2-ci-results.log");
   using var writer=new StreamWriter(report,false,new UTF8Encoding(false)){AutoFlush=true};
   void Log(string line){writer.WriteLine(line);Console.WriteLine(line);}
+  _log=Log;
   Log("KENTRO V2 REAL WINDOWS SELF TEST · "+DateTime.UtcNow.ToString("o"));
   await Toolchains.EnsureAsync(Log);
   string diag=await Toolchains.DiagnosticAsync();
