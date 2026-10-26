@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "app": "Κέντρο Προγραμματισμού",
+  "as_of": "2026-10-26",
+  "selection_policy": "Use this file for last approved build. Do not infer from main/tag/file name. Change only after explicit user acceptance and actual binary/source identification.",
+  "repo": "Kentro-Programmatismou",
+  "version": null,
+  "status": "no_approved_binary",
+  "source_commit": null,
+  "exe_sha256": null,
+  "drive": null,
+  "note": "README describes 1.0.0-beta2; no user-validated stable binary."
+}
